@@ -1,8 +1,7 @@
 /venv
 /.vscode
 /__pycache__
-.DS_Store
 /queries
 /recordings
 **.pyc
-runner.py
+.DS_Store
