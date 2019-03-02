@@ -1,6 +1,9 @@
-from urllib import request
+from urllib import request, error
 import json, os, errno
 
+
+# TODO: Add try, except, finally blocks everywhere
+# TODO: ADD KeyboardInterrupt for any key that deletes temp and active file to prevent data corruption
 def create_dir(directory):
     try:
         os.makedirs(directory)
@@ -15,7 +18,10 @@ def get_recordings(search):
     url = 'https://www.xeno-canto.org/api/2/recordings?query='
     for val in search:
         url += val + '%20'
-    r = request.urlopen(url)
+    try:
+        r = request.urlopen(url)
+    except error.HTTPError:
+        print('Error: 404! ' + url + ' does not exist!')
     data = r.read()
     data_json = json.loads(data.decode('utf-8'))
     pages = data_json["numPages"]
@@ -39,9 +45,13 @@ def get_recordings(search):
             rec_name = (data_json["recordings"][k]["en"]).replace(' ', '') + data_json["recordings"][k]["id"]
             if (os.path.isfile(os.getcwd() + '/recordings/' + rec_name + '.mp3')) == False:
                 download_url = 'https:' + data_json["recordings"][k]["file"]
-                mp3 = open(os.getcwd() + '/recordings/temp.mp3', 'wb')
-                dl = request.urlopen(download_url)
+                try:
+                    dl = request.urlopen(download_url)
+                except error.HTTPError:
+                    print((data_json["recordings"][k]["en"]).replace(' ', '') + data_json["recordings"][k]["id"] + ' could not be found at: ' + download_url)
+                    continue
                 data = dl.read()
+                mp3 = open(os.getcwd() + '/recordings/temp.mp3', 'wb')
                 mp3.write(data)
                 mp3.close()
                 os.rename(os.getcwd() + '/recordings/temp.mp3', os.getcwd() + '/recordings/' + rec_name + '.mp3')
