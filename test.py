@@ -1,6 +1,7 @@
 import unittest
 from urllib import request
 from xenocanto import get_recordings, create_dir
+from library import filter_quality
 import os
 import shutil
 
@@ -27,6 +28,13 @@ class TestCases(unittest.TestCase):
         result = len([1 for x in list(os.scandir(os.getcwd() + '/recordings/')) if x.is_file()])
         self.assertTrue(os.path.isfile(os.getcwd() + '/queries/gen:rhea_cnt:Brazil/page1.json'))
         self.assertEqual(result, 10)
+
+
+    def test_filter_quality(self):
+        get_recordings(['gen:rhea', 'cnt:Brazil'])
+        filter_quality('/queries/gen:rhea_cnt:Brazil', 'B')
+        self.assertTrue(os.path.exists(os.getcwd() + '/filtered/'))
+        self.assertEqual
 
 
     # Remove testing directories

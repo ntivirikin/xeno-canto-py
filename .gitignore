@@ -5,3 +5,4 @@
 /recordings
 **.pyc
 .DS_Store
+runner.py

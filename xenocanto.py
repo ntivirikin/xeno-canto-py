@@ -23,7 +23,12 @@ def get_recordings(search):
     try:
         r = request.urlopen(url)
     except error.HTTPError:
-        print('Error: 404! ' + url + ' does not exist!')
+        errmsg = 'Error: 404! ' + url + ' does not exist!'
+        create_dir(os.getcwd() + '/log/')
+        errlog = open(os.getcwd() + '/log/connect_err.txt')
+        errlog.write(errmsg + "\n")
+        errlog.close()
+        print(errmsg)
     data = r.read()
     data_json = json.loads(data.decode('utf-8'))
 
@@ -58,7 +63,12 @@ def get_recordings(search):
                 try:
                     dl = request.urlopen(download_url)
                 except error.HTTPError:
-                    print((data_json["recordings"][k]["en"]).replace(' ', '') + data_json["recordings"][k]["id"] + ' could not be found at: ' + download_url)
+                    errmsg = (data_json["recordings"][k]["en"]).replace(' ', '') + data_json["recordings"][k]["id"] + ' could not be found at: ' + download_url
+                    create_dir(os.getcwd() + '/log/')
+                    errlog = open(os.getcwd() + '/log/download_err.txt')
+                    errlog.write(errmsg + "\n")
+                    errlog.close()
+                    print(errmsg)
                     continue
                 data = dl.read()
                 mp3 = open(os.getcwd() + '/recordings/temp.mp3', 'wb')
