@@ -1,7 +1,6 @@
 import unittest
 from urllib import request
 from xenocanto import get_recordings, create_dir
-from library import filter_quality
 import os
 import shutil
 
