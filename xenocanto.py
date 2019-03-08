@@ -1,133 +1,106 @@
-from urllib import request
-import json, os, errno, error, shutil
+from urllib import request, error
+from datetime import datetime
+import json, os, errno, shutil
 
-#TODO: Combine filter with get_recordings?
 
-
+# Creates error log with error message appended
 def err_log(errno):
-    errmsg = 'Error: ' + errno + ' Please view the error log for more details.'
-    errlog = open(os.getcwd() + '/error_log.txt')
+    errmsg = 'Herp.'
+    errlog = open(os.getcwd() + '/error_log.txt', 'w+')
     errlog.write(errmsg + '\n')
     errlog.close()
-    print(errmsg)
+    print('An error occurred. Please consult the error log for more details.')
 
 
-# Creates directory if it does not exist
+# Creates directory with error logging
 def create_dir(directory):
     try:
         os.makedirs(directory)
     except OSError as e:
         if e.errno != errno.EEXIST:
-            errmsg = 'Error: ' + e.errno + ' Please view the error log for more details.'
-            err_log(errmsg)
+            err_log(e.errno)
             raise
 
 
 # Creates a URL based on user given criteria and whether pages are being scanned
-def url_builder(criteria, pages = None):
+def url_builder(criteria, pages = 0):
     url = 'https://www.xeno-canto.org/api/2/recordings?query='
     url_list = []
     for val in criteria:
         url += val + ' '
-    if pages != None:
-        for i in range(1, pages):
-            url_temp += '&page=' + i
+    if pages != 0:
+        for i in range(1, pages + 1):
+            url_temp = url + '&page=' + str(i)
+            url_temp = url_temp.replace(' ', '')
             url_list.append(url_temp)
             return url_list
     else:
         return url
 
 
-# Open and retrieve JSON data from a URL
-def read_url(url):
+# Retrieve JSON based on search criteria
+def get_json(search):
+    url = url_builder(search)
     try:
         r = request.urlopen(url)
     except error.HTTPError as e:
         err_log(e.errno)
-    return r.read()
-
-
-# Filter for any tags included in .json
-def filter_lib(path, criteria):
-    create_dir(os.getcwd() + '/filtered/')
-    temp_list = []
-    for root, dirs, files in os.walk(path):
-        for name in files:
-            load = json.load(os.path.join(root, name))
-            for i in range(0, len(load["recordings"])):
-                for j in criteria:
-                    res = j.split(':')
-                    if load["recordings"][i][res[0]] == res[1]:
-                        temp_list.append((load["recordings"][i]["en"]).replace(' ', '') + load["recordings"][i]["id"] + '.mp3')
-            load.close()
-    for i in temp_list:
-        shutil.copy2(os.getcwd() + '/recordings/' + i, os.getcwd() + '/filtered/' + i)
-    return temp_list
+        raise
+    data = json.loads(r.read().decode('UTF-8'))
     
+    # Creating folder name and replacing characters
+    name = url[50:-1]
+    for re in (('%20', '_'), ('%2', ''), (':', '|')):
+        name = name.replace(*re)
+    folder = os.getcwd() + '/queries/' + name
+    create_dir(folder)
 
-# This is separate because it needs to connect to internet (only in advanced, can be bypassed by putting this into get_recordings)
-def filter_background(background):
-    url = url_builder(background)
-    data = read_url(url)
-    data_json = json.loads(data.decode('utf-8'))
-
-    # Retrieve queries as .json files for all pages
-    num_pages = data_json["numPages"]
-    temp_list = []
-
-    for i in url_builder(background, pages = num_pages):
-        read_url(i)
-        data_json = json.loads(data)
-        
-        for i in range(0, len(data_json["recordings"])):
-            temp_list.append((data_json["recordings"][i]["en"]).replace(' ', '') + data_json["recordings"][i]["id"] + '.mp3')
-        data_json.close()
-
-    for i in temp_list:
-        shutil.copy2(os.getcwd() + '/recordings/' + i, os.getcwd() + '/filtered/' + i)
-    return temp_list
-
-
-# Downloads all recordings based on search criteria
-def get_recordings(search):
-
-    # Initial query to determine number of pages and file name
-    create_dir(os.getcwd() + '/queries')
-    create_dir(os.getcwd() + '/recordings')
-    
-    url = url_builder(search)
-    data = read_url(url)
-    data_json = json.loads(data.decode('utf-8'))
-
-    # Name of query folder will be the inputted search criteria
-    name = ((url[50:-1]).replace('%20', '_')).replace('%2', '')
-    create_dir(os.getcwd() + '/queries/' + name)
-
-    # Retrieve queries as .json files for all pages
-    num_pages = data_json["numPages"]
+    # Saving JSON from all pages
+    num_pages = data["numPages"]
+    print(num_pages)
+    temp_txt = folder + '/temp.txt'
+    json_list = []
+    page = 1
+    for url in url_builder(search, num_pages):
+        try:
+            r = request.urlopen(url)
+        except error.HTTPError as e:
+            err_log(e.errno)
+            continue
+        data = json.loads(r.read().decode('UTF-8'))
+        txt = open(temp_txt, 'w+')
+        json.dump(data, txt)
+        txt.close()
+        file_name = folder + '/page' + str(page) + '.json'
+        os.rename(temp_txt, file_name)
+        json_list.append(file_name)
+        page += 1
+    return json_list
 
 
-    for i in url_builder(search, pages = num_pages):
-        read_url(i)
-        data_json = json.loads(data.decode('utf-8'))
-        query_info = open(os.getcwd() + '/queries/' + name + '/temp.txt', 'w+')
-        json.dump(data_json, query_info)
-        query_info.close()
+def get_mp3(path):
+    # Creating folder structure and reserving temp path
+    folder = os.getcwd() + '/recordings/'
+    mp3_list = []
+    create_dir(folder)
+    temp_mp3 = folder + 'temp.mp3'
 
-        # Query files saved under related folder and named after page number
-        os.rename(os.getcwd() + '/queries/' + name + '/temp.txt', os.getcwd() + '/queries/' + name + '/page' + str(i) + '.json')
-
-        # Retrieve recordings as .mp3 files from current page
-        for k in range(0, len(data_json["recordings"])):
-            
-            # Recording name will be the English name tag value and recording id
-            rec_name = (data_json["recordings"][k]["en"]).replace(' ', '') + data_json["recordings"][k]["id"]
-            if (os.path.isfile(os.getcwd() + '/recordings/' + rec_name + '.mp3')) == False:
-                download_url = 'https:' + data_json["recordings"][k]["file"]
-
-                read_url(download_url)
-
-                mp3 = open(os.getcwd() + '/recordings/temp.mp3', 'wb')
+    # Parsing all JSON files for download links and executing them
+    for file in path:
+        data = json.load(file)
+        for i in range(0, len(data["recordings"])):
+            rec_path = folder + (data["recordings"][i]["en"]).replace(' ', '') + data["recordings"][i]["id"] + '.mp3'
+            if (os.path.exists(rec_path)) == False:
+                url = 'https:' + data["recordings"][i]["file"]
+                try:
+                    r = request.urlopen(url)
+                except error.HTTPError as e:
+                    err_log(e.errno)
+                    continue
+                data = r.read()
+                mp3 = open(temp_mp3, 'wb')
                 mp3.write(data)
-                mp3.close()
-                os.rename(os.getcwd() + '/recordings/temp.mp3', os.getcwd() + '/recordings/' + rec_name + '.mp3')
+                mp3.close
+                os.rename(temp_mp3, rec_path)
+                mp3_list.append(rec_path)
+    return mp3_list
