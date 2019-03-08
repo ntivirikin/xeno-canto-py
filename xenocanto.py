@@ -3,13 +3,11 @@ from datetime import datetime
 import json, os, errno, shutil
 
 
-# Creates error log with error message appended
-def err_log(errno):
-    errmsg = 'Herp.'
-    errlog = open(os.getcwd() + '/error_log.txt', 'w+')
-    errlog.write(errmsg + '\n')
-    errlog.close()
-    print('An error occurred. Please consult the error log for more details.')
+# Prints error message to users
+def err_log(error):
+    date = str(datetime.utcnow())
+    errmsg = '[' + date + '] ' + str(error.__name__) + ' occurred.'
+    print(errmsg)
 
 
 # Creates directory with error logging
@@ -18,7 +16,7 @@ def create_dir(directory):
         os.makedirs(directory)
     except OSError as e:
         if e.errno != errno.EEXIST:
-            err_log(e.errno)
+            err_log(e)
             raise
 
 
@@ -44,7 +42,7 @@ def get_json(search):
     try:
         r = request.urlopen(url)
     except error.HTTPError as e:
-        err_log(e.errno)
+        err_log(e)
         raise
     data = json.loads(r.read().decode('UTF-8'))
     
@@ -65,7 +63,7 @@ def get_json(search):
         try:
             r = request.urlopen(url)
         except error.HTTPError as e:
-            err_log(e.errno)
+            err_log(e)
             continue
         data = json.loads(r.read().decode('UTF-8'))
         txt = open(temp_txt, 'w+')
@@ -87,7 +85,7 @@ def get_mp3(path):
 
     # Parsing all JSON files for download links and executing them
     for file in path:
-        data = json.load(file)
+        data = json.load(open(file))
         for i in range(0, len(data["recordings"])):
             rec_path = folder + (data["recordings"][i]["en"]).replace(' ', '') + data["recordings"][i]["id"] + '.mp3'
             if (os.path.exists(rec_path)) == False:
@@ -95,7 +93,7 @@ def get_mp3(path):
                 try:
                     r = request.urlopen(url)
                 except error.HTTPError as e:
-                    err_log(e.errno)
+                    err_log(e)
                     continue
                 data = r.read()
                 mp3 = open(temp_mp3, 'wb')
@@ -104,3 +102,10 @@ def get_mp3(path):
                 os.rename(temp_mp3, rec_path)
                 mp3_list.append(rec_path)
     return mp3_list
+
+
+# Get recordings based on search term, returns lists of json and mp3 paths
+def get_rec(search):
+    json_list = get_json(search)
+    mp3_list = get_mp3(json_list)
+    return [json_list, mp3_list]

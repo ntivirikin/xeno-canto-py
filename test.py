@@ -1,4 +1,4 @@
-from xenocanto import create_dir, get_json
+from xenocanto import err_log, create_dir, get_json, get_mp3, get_rec
 from urllib import request
 import unittest
 import shutil, os
@@ -10,11 +10,29 @@ class TestCases(unittest.TestCase):
         self.assertEqual(status, 200)
 
 
-    # Check if all JSON files for all pages are being saved
+    # Check if JSON retrieval is working
     def test_get_json(self):
         get_json(['gen:Otis'])
         self.assertTrue(os.path.exists(os.getcwd() + '/queries/gen|Otis/page1.json'))
 
-    # Tear down test folders and files
+
+    # Check if mp3 retrieval from JSON is working
+    def test_get_mp3(self):
+        get_mp3(get_json(['gen:Otis']))
+        self.assertTrue(os.getcwd() + '/recordings/GreatBustard459281.mp3')
+
+
+    # Check if get_rec retrieves JSON and mp3
+    def test_get_rec(self):
+        get_rec(['gen:Otis'])
+        self.assertTrue(os.path.exists(os.getcwd() + '/queries/gen|Otis/page1.json'))
+        self.assertTrue(os.getcwd() + '/recordings/GreatBustard459281.mp3')
+
+
+    # Remove folders used for testing
     def tearDown(self):
-        shutil.rmtree(os.getcwd() + '/queries/')
+        try:
+            shutil.rmtree(os.getcwd() + '/queries/')
+            shutil.rmtree(os.getcwd() + '/recordings/')
+        except FileNotFoundError:
+            pass
