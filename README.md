@@ -22,8 +22,8 @@ The following commands will retrieve the query information for the genus *Otis* 
 import xenocanto
 
 
-json_list = get_json(['gen:Otis'])
-mp3_list = get_mp3(json_list)
+json_list = xenocanto.get_json(['gen:Otis'])
+mp3_list = xenocanto.get_mp3(json_list)
 ```
 
 ```get_rec``` calls ```get_json``` with the provided query and immediately  calls ```get_mp3``` afterwards.
@@ -33,7 +33,7 @@ The following command will produce the same result as above.
 ```python
 import xenocanto
 
-get_rec(['gen:Otis'])
+xenocanto.get_rec(['gen:Otis'])
 ```
 
 This will generate two folders, ```queries``` and ```recordings``` which will contain the JSON files with query data and recordings as MP3 files respectively.
