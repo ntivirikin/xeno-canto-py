@@ -1,0 +1,3 @@
+v1.0.0, March 11, 2019 -- Initial release.
+v1.0.1, March 11, 2019 -- Fixed setup.py
+v1.0.2, March 11, 2019 -- Included tests, fixed print error in get_json.

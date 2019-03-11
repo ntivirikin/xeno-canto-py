@@ -6,3 +6,6 @@
 **.pyc
 .DS_Store
 runner.py
+/dist
+/xenocanto.egg-info
+/build

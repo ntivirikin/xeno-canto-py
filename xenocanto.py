@@ -55,7 +55,6 @@ def get_json(search):
 
     # Saving JSON from all pages
     num_pages = data["numPages"]
-    print(num_pages)
     temp_txt = folder + '/temp.txt'
     json_list = []
     page = 1
