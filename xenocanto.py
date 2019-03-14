@@ -83,7 +83,8 @@ def get_json(search):
     return json_list
 
 
-def get_mp3(search):
+# Retrieves recording based on list of downloaded JSON file paths
+def get_mp3(paths):
     # Creating folder structure and reserving temp path
     folder = os.getcwd() + '/recordings/'
     mp3_list = []
@@ -91,7 +92,7 @@ def get_mp3(search):
     temp_mp3 = folder + 'temp.mp3'
 
     # Parsing all JSON files for download links and executing them
-    for file in search:
+    for file in paths:
         json_file = open(file)
         data = json.load(json_file)
         json_file.close()
@@ -114,11 +115,15 @@ def get_mp3(search):
                 mp3.close
                 os.rename(temp_mp3, rec_path)
                 mp3_list.append(rec_path)
+                
+    # Returns string list of downloaded recording file paths
     return mp3_list
 
 
-# Comment
+# Combines get_json and get_mp3 for convenience
 def get_rec(search):
     json_list = get_json(search)
     mp3_list = get_mp3(json_list)
+
+    # Returns string lists of get_json and get_mp3 respectively
     return [json_list, mp3_list]

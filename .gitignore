@@ -7,5 +7,5 @@
 .DS_Store
 runner.py
 /dist
-/xenocanto.egg-info
+*.egg-info
 /build
