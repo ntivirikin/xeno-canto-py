@@ -9,7 +9,7 @@ Originally created to aid in data collection and filtering for the training of m
 Use the package manager [pip](https://pip.pypa.io/en/stable/) to install xeno-canto-py, or copy and paste the ```xenocanto.py``` file into your working directory.
 
 ```bash
-pip install xenocanto
+pip install xeno-canto
 ```
 
 ## Usage
