@@ -129,45 +129,47 @@ def get_rec(search):
     return [json_list, mp3_list]
 
 
-# Scan directory for track id and write if found
-def scan_dir(directory):
-    ilist = os.scandir(directory)
-    for item in i list:
+# Scan directory for track id and write if found                               
+def scan_dir(directory):                                                       
+    ilist = os.scandir(directory)                                              
+    meta_data = open(os.getcwd() + 'temp.txt'                                  
+    for item in ilist:                                                        
+                                                                               
+        # Scan if item is a directory                                          
+        if item.is_dir:                                                   
+            scan_dir(item.path)                                                
+        else:                                                                  
+            odata = open(item.path)                                            
+            jdata = json.load(odata)                                           
+                                                                               
+            for j in range(0, len(jdata["recordings"]):                        
+                if id_num == jdata["recordings"][j]["id"]:                     
+                    if j == len(jdata["recordings"]):                         
+                        json.dumps(jdata["recordings"][j], meta_data)
+                    else:                              
+                        json.dumps(jdata["recordings"][j] + ',', meta_data)              
+                        break
 
-        # Scan if item is a directory
-        if item.type == dir:
-            scan_dir(item.path)
-        else:
-            odata = open(item.path)
-            jdata = json.load(odata)
 
-            for j in range(0, len(jdata["recordings"]):
-                if id_num == jdata["recordings"][j]["id"]:
-                    
-                    # Write entry to os.getcwd() + 'metadata.json'
-                    # {"id":123512, "gen":"Otis"}
-                    json.write(jdata["recordings"][j])
-                    break
-
-
-# Generates a metadata file for given library path
-def gen_meta(path = os.getcwd() + '/recordings/'):
-    
-    # Create a json file with the required opening brackets:  { [
-    meta_start = open('temp.txt', w+)
-    json.dumps(string, meta_start)
-    meta_start.close()
-    
-    id_list = list()
-    scan_list = os.scandir(path)
-    
-    for scans in scan_list:
-        filename = scans.name
+# Generate a metadata file for given library path
+def gen_meta(path):
+    meta_data = open(os.getcwd() + 'temp.txt', w+)
+    json.dumps('{[', meta_data)                                                
+    meta_data.close()                                                          
+                                                                               
+    id_list = list()                                                           
+    scan_list = os.scandir(path)                                               
+                                                                               
+    for scans in scan_list:                                                    
+        filename = scans.name                                                  
         ident = filename.split('_')[1]
-        id_list.append(ident)    
- 
-    # Scan queries path recursively for track ids
+        id_list.append(ident)                                                  
+                                                                               
+    # Scan queries path for track ids                              
     scan_dir(os.getcwd() + '/queries/')
-
-    # Remove last comma and write closing brackets for equation: ] }
-    # json_file[-1] = ] assign last place ], then add }
+                                                                               
+    # Write closing brackets to json
+    meta_data = open(os.getcwd() + 'temp.txt', w+)
+    json.dumps(']}', meta_data)
+    meta_data.close()
+    os.rename(os.getcwd() + 'temp.txt', os.getcwd() + 'metadata.json')
