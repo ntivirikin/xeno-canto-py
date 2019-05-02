@@ -38,10 +38,22 @@ xenocanto.get_rec(['gen:Otis'])
 
 This will generate two folders, ```queries``` and ```recordings``` which will contain the JSON files with query data and recordings as MP3 files respectively.
 
+The following will generate metadata in JSON form for machine learning models, assuming we are using the default recordings directory in the project folder. ```gen_meta``` will also accept a custom path if your recording library is located elsewhere.
+
+```python
+import xenocanto
+
+xenocanto.gen_meta()
+```
+
+Metadata is saved to the local directory as ```metadata.json``` formatted as shown below.
+
+```json
+{["list":{"id":1, "label":value}]}
+```
 ## Roadmap
 
 * Add filtering of ```recordings``` folders (mainly by quality and background species)
-* Add basic pre-processing abilities (file conversion, re-sampling, etc.) on a as-needed basis
 * Add entrypoints for easier use
 
 I am always open to suggestions for features!

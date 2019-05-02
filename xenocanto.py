@@ -145,12 +145,17 @@ def scan_dir(directory, id_list, write_list):
             for id_num in id_list:                                                                   
                 for j in range(0, len(jdata["recordings"])):                        
                     if id_num == jdata["recordings"][j]["id"]:
-                        write_list.append(json.dumps(jdata["recordings"][j]))
+                        track_id = jdata["recordings"][j]["id"]
+                        species_j = jdata["recordings"][j]["gen"] + ' ' + jdata["recordings"][j]["sp"]
+                        if jdata["recordings"][j]["ssp"] != '':
+                            species_j += ' ' + jdata["recordings"][j]["ssp"]
+                        species_j = species_j.replace('"', '')
+                        write_list.append('{"id":' + track_id + ', "species":"' + species_j + '"}')
     return write_list
 
 # Generate a metadata file for given library path
-# TODO: Allow user to choose which tags are saved to metadata to reduce json size and complexity
-def gen_meta(path):
+# TODO: Ensure consistent naming for gen, sp, and ssp tags
+def gen_meta(path=os.getcwd() + '/recordings/'):
     id_list = list()
     write_list = list()
     scan_list = os.scandir(path)                                               
@@ -165,6 +170,9 @@ def gen_meta(path):
     # Scan queries path for track ids                              
     scan_string = scan_dir(os.getcwd() + '/queries/', id_list, write_list)
     meta_data = open('temp.txt', 'w+')
-    meta_data.write('{"list":[' + ','.join(scan_string) + ']}')
+    meta_data.write('[' + ','.join(scan_string) + ']')
     meta_data.close()
     os.rename('temp.txt', 'metadata.json')
+
+
+# TODO: Sort metadata by tag
