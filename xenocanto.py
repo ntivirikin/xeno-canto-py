@@ -23,7 +23,7 @@ def create_dir(directory):
             raise
 
 
-# Creates a URL based on user given criteria and page number
+# Creates a URL based on user given criteria and number of pages (defaults to reading all pages)
 def url_builder(criteria, pages=0):
     url = 'https://www.xeno-canto.org/api/2/recordings?query='
     url_list = []
@@ -129,13 +129,14 @@ def get_rec(search):
     return [json_list, mp3_list]
 
 
-# Scan directory for track id and write if found                               
+# Scan directory for existing track id and write if found
+# TODO: If track information cannot be found, check the database through track id
 def scan_dir(directory, id_list, write_list):
     dir_temp = directory.replace(' ', '_')
     ilist = os.scandir(dir_temp)                                  
     for item in ilist:                                                        
                                                                                
-        # Scan if item is a directory                                          
+        # Determine if item is a directory                                          
         if item.is_dir():                                                   
             scan_dir(item.path, id_list, write_list)                                                
         else:                                                                  
@@ -155,6 +156,7 @@ def scan_dir(directory, id_list, write_list):
 
 # Generate a metadata file for given library path
 # TODO: Ensure consistent naming for gen, sp, and ssp tags
+# TODO: Add ability to specify path of queries folder
 def gen_meta(path=os.getcwd() + '/recordings/'):
     id_list = list()
     write_list = list()
@@ -167,7 +169,7 @@ def gen_meta(path=os.getcwd() + '/recordings/'):
         ident = split_two[0]
         id_list.append(ident)                                                  
                                                                                
-    # Scan queries path for track ids                              
+    # Scan queries folder path for track ids                              
     scan_string = scan_dir(os.getcwd() + '/queries/', id_list, write_list)
     meta_data = open('temp.txt', 'w+')
     meta_data.write('[' + ','.join(scan_string) + ']')
