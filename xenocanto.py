@@ -4,6 +4,7 @@ import shutil
 import errno
 import json
 import os
+import time
 
 
 # Prints error message to user when caught
@@ -39,48 +40,34 @@ def url_builder(criteria, pages=0):
         return url
 
 
-# Retrieve JSON based on search criteria
-def get_json(search):
-    json_list = []
-
-    # Check response with search criteria to determine number of response pages
-    url = url_builder(search)
-    try:
-        r = request.urlopen(url)
-    except error.HTTPError as e:
-        err_log(e)
-        raise
-    data = json.loads(r.read().decode('UTF-8'))
-    num_pages = data["numPages"]
-
-    # Creating folder structure from search criteria
-    name = url[50:-1]
-    for re in (('%20', '_'), ('%2', ''), (':', '|')):
-        name = name.replace(*re)
-    folder = os.getcwd() + '/queries/' + name
-    create_dir(folder)
-    temp_txt = folder + '/temp.txt'
-
-    # Parsing through and saving each page
-    url_list = url_builder(search, pages=int(num_pages))
+# Retrieves metadata for requested recordings in the form of a JSON file
+def metadata(filt):
     page = 1
-    for url in url_list:
+    numPages = 1
+    path = 'dataset/metadata/' + ''.join(filt)
+    if not os.path.exists(path):
+        os.makedirs(path)
+    else:
+        print('The specified query folder already exists, please rename or remove the folder from the directory and try again.')
+        exit()
+
+    # Save all pages of the JSON response    
+    while page < numPages + 1:
+        url = 'https://www.xeno-canto.org/api/2/recordings?query={0}&page={1}'.format('%20'.join(filt), page)
         try:
             r = request.urlopen(url)
         except error.HTTPError as e:
             err_log(e)
             continue
         data = json.loads(r.read().decode('UTF-8'))
-        txt = open(temp_txt, 'w+')
-        json.dump(data, txt)
-        txt.close()
-        file_name = folder + '/page' + str(page) + '.json'
-        os.rename(temp_txt, file_name)
-        json_list.append(file_name)
+        filename = path + '/page' + str(page) + '.json'
+        with open(filename, 'w') as saved:
+            json.dump(data, saved)
+        numPages = data['numPages']
         page += 1
 
-    # Returns a string list of paths for downloaded files
-    return json_list
+    # Return the path to the folder containing downloaded metadata
+    return path
 
 
 # Retrieves recording based on list of downloaded JSON file paths
@@ -122,7 +109,7 @@ def get_mp3(paths):
 
 # Combines get_json and get_mp3 for convenience
 def get_rec(search):
-    json_list = get_json(search)
+    json_list = metadata(search)
     mp3_list = get_mp3(json_list)
 
     # Returns string lists of get_json and get_mp3 respectively
