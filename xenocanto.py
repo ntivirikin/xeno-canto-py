@@ -24,41 +24,38 @@ def create_dir(directory):
             raise
 
 
-# Creates a URL based on user given criteria and number of pages (defaults to reading all pages)
-def url_builder(criteria, pages=0):
-    url = 'https://www.xeno-canto.org/api/2/recordings?query='
-    url_list = []
-    for val in criteria:
-        url += val + '%20'
-    if pages != 0:
-        for i in range(1, pages + 1):
-            url_temp = url + '&page=' + str(i)
-            url_temp = url_temp.replace(' ', '')
-            url_list.append(url_temp)
-        return url_list
-    else:
-        return url
-
-
 # Retrieves metadata for requested recordings in the form of a JSON file
 def metadata(filt):
     page = 1
     numPages = 1
-    path = 'dataset/metadata/' + ''.join(filt)
+
+    # Scrubbing input for file name and url
+    filt_path = list()
+    for f in filt:
+        f = (f.replace(' ', '')).replace(':', '_')
+        filt_path.append(f)
+
+    filt_url = list()
+    for f in filt:
+        f = f.replace(' ', '%20')
+        filt_url.append(f)
+
+    path = 'dataset/metadata/' + '&'.join(filt_path)
     if not os.path.exists(path):
         os.makedirs(path)
     else:
-        print('The specified query folder already exists, please rename or remove the folder from the directory and try again.')
+        print('The specified query folder already exists, please + \
+            rename or remove the folder from the directory and try again.')
         exit()
 
     # Save all pages of the JSON response    
     while page < numPages + 1:
-        url = 'https://www.xeno-canto.org/api/2/recordings?query={0}&page={1}'.format('%20'.join(filt), page)
+        url = 'https://www.xeno-canto.org/api/2/recordings?query={0}&page={1}'.format('%20'.join(filt_url), page)
         try:
             r = request.urlopen(url)
         except error.HTTPError as e:
             err_log(e)
-            continue
+            exit()
         data = json.loads(r.read().decode('UTF-8'))
         filename = path + '/page' + str(page) + '.json'
         with open(filename, 'w') as saved:
@@ -105,15 +102,6 @@ def get_mp3(paths):
                 
     # Returns string list of downloaded recording file paths
     return mp3_list
-
-
-# Combines get_json and get_mp3 for convenience
-def get_rec(search):
-    json_list = metadata(search)
-    mp3_list = get_mp3(json_list)
-
-    # Returns string lists of get_json and get_mp3 respectively
-    return [json_list, mp3_list]
 
 
 # Scan directory for existing track id and write if found
