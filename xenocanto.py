@@ -1,11 +1,7 @@
 from urllib import request, error
-from urllib.request import urlretrieve
-import urllib
 import shutil
-import errno
 import json
 import os
-import time
 
 
 # Retrieves metadata for requested recordings in the form of a JSON file
@@ -48,15 +44,20 @@ def metadata(filt):
     return path
 
 
+# Retrieves metadata and audio recordings
 def download(filt):
     page = 1
     page_num = 1
+
+    # Retrieve metadata to parse for download links
     path = metadata(filt)
     while page < page_num + 1:
         with open(path + '/page' + str(page) + ".json", 'r') as jsonfile:
             data = jsonfile.read()
         data = json.loads(data)
         page_num = data['numPages']
+
+        # Pulling species name, track ID, and download link for naming and retrieval
         for i in range(len((data['recordings']))):
             url = 'http:' + data['recordings'][i]['file']
             name = (data['recordings'][i]['en']).replace(' ', '')
@@ -65,11 +66,11 @@ def download(filt):
             audio_file = track_id + '.mp3'
             if not os.path.exists(audio_path):
                 os.makedirs(audio_path)
-            else:
-                continue
-            if os.path.exists(audio_path + audio_file):
+
+            # If the file exists in the directory, we will skip it
+            elif os.path.exists(audio_path + audio_file):
                 break
-            urllib.request.urlretrieve(url, audio_path + audio_file)
+            request.urlretrieve(url, audio_path + audio_file)
         page += 1
 
 
@@ -121,4 +122,12 @@ def gen_meta(path=os.getcwd() + '/recordings/'):
     os.rename('temp.txt', 'metadata.json')
 
 
-# TODO: Sort metadata by tag
+# Removes audio folders containing num or less than num files
+def purge(num):
+    path = 'dataset/audio/'
+    dirs = os.listdir(path)
+    for fold in dirs:
+        fold_path = path + fold
+        count = len(os.listdir(fold_path))
+        if count <= num:
+            shutil.rmtree(fold_path)

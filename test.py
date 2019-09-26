@@ -1,4 +1,4 @@
-from xenocanto import metadata, download
+from xenocanto import metadata, download, purge
 from urllib import request
 import unittest
 import shutil
@@ -25,6 +25,13 @@ class TestCases(unittest.TestCase):
         self.assertTrue(os.path.exists('dataset/metadata/gen_Otis/page1.json'))
         self.assertTrue(os.path.exists('dataset/audio/GreatBustard/459281.mp3'))
 
+    # Check if purge is deleting folders based on file count
+    def test_purge(self):
+        download(['gen:Otis'])
+        download(['Bearded Bellbird', 'q:A', 'cnt:Brazil'])
+        purge(7)
+        self.assertFalse(os.path.exists('dataset/audio/GreatBustard/'))
+        self.assertTrue(os.path.exists('dataset/audio/BeardedBellbird/'))
 
     # Removes files used in testing
     def tearDown(self):
