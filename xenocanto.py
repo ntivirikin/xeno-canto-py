@@ -73,54 +73,43 @@ def download(filt):
             request.urlretrieve(url, audio_path + audio_file)
         page += 1
 
-
-# Scan directory for existing track id and write if found
-# TODO: If track information cannot be found, check the database through track id
-def scan_dir(directory, id_list, write_list):
-    dir_temp = directory.replace(' ', '_')
-    ilist = os.scandir(dir_temp)                                  
-    for item in ilist:                                                        
-                                                                               
-        # Determine if item is a directory                                          
-        if item.is_dir():                                                   
-            scan_dir(item.path, id_list, write_list)                                                
-        else:                                                                  
-            odata = open(item.path)                                            
-            jdata = json.load(odata)                                           
-
-            for id_num in id_list:                                                                   
-                for j in range(0, len(jdata["recordings"])):                        
-                    if id_num == jdata["recordings"][j]["id"]:
-                        track_id = jdata["recordings"][j]["id"]
-                        species_j = jdata["recordings"][j]["gen"] + ' ' + jdata["recordings"][j]["sp"]
-                        if jdata["recordings"][j]["ssp"] != '':
-                            species_j += ' ' + jdata["recordings"][j]["ssp"]
-                        species_j = species_j.replace('"', '')
-                        write_list.append('{"id":' + track_id + ', "species":"' + species_j + '"}')
-    return write_list
-
 # Generate a metadata file for given library path
-# TODO: Ensure consistent naming for gen, sp, and ssp tags
-# TODO: Add ability to specify path of queries folder
-def gen_meta(path=os.getcwd() + '/recordings/'):
-    id_list = list()
-    write_list = list()
-    scan_list = os.scandir(path)                                               
-                                                                               
-    for scans in scan_list:                                                    
-        filename = scans.name                                                  
-        split_one = filename.split('_')
-        split_two = split_one[1].split('.')
-        ident = split_two[0]
-        id_list.append(ident)                                                  
-                                                                               
-    # Scan queries folder path for track ids                              
-    scan_string = scan_dir(os.getcwd() + '/queries/', id_list, write_list)
-    meta_data = open('temp.txt', 'w+')
-    meta_data.write('[' + ','.join(scan_string) + ']')
-    meta_data.close()
-    os.rename('temp.txt', 'metadata.json')
+def gen_meta(path='/dataset/audio/'):
+    
+    # Create a list of track ID's contained in the current library
+    id_list = set()
+    for fold in os.listdir(path):
+        filenames = os.listdir(fold)
+        for f in filenames:
+            track_id = (f.split('.'))[0]
+            id_list.update(track_id)
+    
+    # Create a list of all metadata files
+    meta_files = list()
+    for filename in os.listdir('/dataset/metadata/'):
+        meta_files.append(filename)
+    
+    # Check each metadata track for presence in library
+    found_files = set()
+    for f in meta_files:
 
+        # Open the json file up
+        with open('dataset/metadata/' + f + '/page') + ".json", 'r') as jsonfile:
+            data = jsonfile.read()
+        data = json.loads(data)
+        page_num = data['numPages']
+        
+        # Parse through each track
+        for i in range(len(data['recordings'])):
+            track = data['recordings'][0]['track_id'] 
+            if track in id_list:
+                found_files.update(track)
+
+    not_found = list(id_list - found_files)
+    for i in not_found:
+        path = metadata('nr:' + i)
+
+    
 
 # Removes audio folders containing num or less than num files
 def purge(num):
