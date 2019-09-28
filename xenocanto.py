@@ -92,25 +92,27 @@ def gen_meta(path='/dataset/audio/'):
     # Check each metadata track for presence in library
     found_files = set()
     for f in meta_files:
+        page_num = 1
+        page = 1
 
-        # Open the json file up
-        with open('dataset/metadata/' + f + '/page') + ".json", 'r') as jsonfile:
-            data = jsonfile.read()
-        data = json.loads(data)
-        page_num = data['numPages']
+        while page < page_num + 1:
+            # Open the json file up
+            with open('dataset/metadata/' + f + '/page'+ str(page)  + ".json", 'r') as jsonfile:
+                data = jsonfile.read()
+            data = json.loads(data)
+            page_num = data['numPages']
         
-        # Parse through each track
-        for i in range(len(data['recordings'])):
-            track = data['recordings'][0]['track_id'] 
-            if track in id_list:
-                found_files.update(track)
+            # Parse through each track
+            for i in range(len(data['recordings'])):
+                track = data['recordings'][0]['track_id'] 
+                if track in id_list:
+                    found_files.update(track)
 
     not_found = list(id_list - found_files)
     for i in not_found:
         path = metadata('nr:' + i)
 
     
-
 # Removes audio folders containing num or less than num files
 def purge(num):
     path = 'dataset/audio/'
