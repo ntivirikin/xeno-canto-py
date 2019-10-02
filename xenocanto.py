@@ -73,20 +73,33 @@ def download(filt):
             request.urlretrieve(url, audio_path + audio_file)
         page += 1
 
+# Retrieve all files while ignoring those that are hidden
+def listdir_nohidden(path):
+    for f in os.listdir(path):
+        if not f.startswith('.'):
+            yield f
+
 # Generate a metadata file for given library path
-def gen_meta(path='/dataset/audio/'):
+def gen_meta(path='dataset/audio/'):
     
     # Create a list of track ID's contained in the current library
     id_list = set()
-    for fold in os.listdir(path):
-        filenames = os.listdir(fold)
+
+    for fold in listdir_nohidden(path):
+        filenames = listdir_nohidden(path + fold)
         for f in filenames:
-            track_id = (f.split('.'))[0]
-            id_list.update(track_id)
+            track_id = (f.split('.'))
+            id_list.add(track_id[0])
     
+    count = len(id_list)
+
+    write_data = dict()
+    write_data['recordingNumber'] = str(count)
+    write_data['tracks'] = list()
+
     # Create a list of all metadata files
     meta_files = list()
-    for filename in os.listdir('/dataset/metadata/'):
+    for filename in listdir_nohidden('dataset/metadata/'):
         meta_files.append(filename)
     
     # Check each metadata track for presence in library
@@ -96,7 +109,8 @@ def gen_meta(path='/dataset/audio/'):
         page = 1
 
         while page < page_num + 1:
-            # Open the json file up
+
+            # Open the json
             with open('dataset/metadata/' + f + '/page'+ str(page)  + ".json", 'r') as jsonfile:
                 data = jsonfile.read()
             data = json.loads(data)
@@ -104,21 +118,38 @@ def gen_meta(path='/dataset/audio/'):
         
             # Parse through each track
             for i in range(len(data['recordings'])):
-                track = data['recordings'][0]['track_id'] 
+                track = data['recordings'][i]['id'] 
                 if track in id_list:
-                    found_files.update(track)
+                    track_info = data['recordings'][i]
+                    write_data['tracks'].append(track_info)
+            page += 1
 
-    not_found = list(id_list - found_files)
+    # Retrieves information from  API for tracks that cannot be found in the 
+    # currently saved metadata
+    found_files = list()
+    for i in range(count):
+        found_files.append(write_data['tracks'][i]['id'])
+    
+    not_found = list(set(id_list) - set(found_files))
+    
     for i in not_found:
         path = metadata('nr:' + i)
+        with open(path) as jsonfile:
+            data = jsonfile.read()
+        data = json.loads(data)
+        write_data['tracks'].append(data['recordings'][0])
 
+    with open('data.txt', 'w') as outfile:
+        json.dump(write_data, outfile)
+
+    os.rename('data.txt', 'dataset/metadata/library.json')
     
 # Removes audio folders containing num or less than num files
 def purge(num):
     path = 'dataset/audio/'
-    dirs = os.listdir(path)
+    dirs = listdir_nohidden(path)
     for fold in dirs:
         fold_path = path + fold
-        count = len(os.listdir(fold_path))
+        count = sum(1 for _ in listdir_nohidden(fold_path))
         if count <= num:
             shutil.rmtree(fold_path)

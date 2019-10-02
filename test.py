@@ -1,4 +1,4 @@
-from xenocanto import metadata, download, purge
+from xenocanto import metadata, download, gen_meta, purge
 from urllib import request
 import unittest
 import shutil
@@ -41,14 +41,16 @@ class TestCases(unittest.TestCase):
     # Check if metadata is being correctly generated for one
     # recording with metadata already saved
     def test_gen_saved(self):
-        download(['gen:Otis'])
-        gen()
+        metadata(['gen:Otis'])
+        download(['Bearded Bellbird', 'q:A', 'cnt:Brazil'])
+        gen_meta()
         self.assertTrue(os.path.exists('dataset/metadata/library.json'))
 
-
+    
     # Removes files used in testing
     def tearDown(self):
         try:
             shutil.rmtree('dataset/')
         except OSError:
             pass
+    
