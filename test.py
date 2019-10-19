@@ -40,9 +40,19 @@ class TestCases(unittest.TestCase):
     
     # Check if metadata is being correctly generated for one
     # recording with metadata already saved
-    def test_gen_saved(self):
+    def test_gen_meta_with_extra_metadata(self):
         metadata(['gen:Otis'])
         download(['Bearded Bellbird', 'q:A', 'cnt:Brazil'])
+        gen_meta()
+        self.assertTrue(os.path.exists('dataset/metadata/library.json'))
+
+    # Check if metadata is being correctly generated when some metadata is saved
+    # and some must be retrieved from an API call
+    def test_gen_meta_with_extra_tracks(self):
+        path = metadata(['gen:Otis'])
+        download(['gen:Otis'])
+        download(['Bearded Bellbird', 'q:A', 'cnt:Brazil'])
+        shutil.rmtree(path)
         gen_meta()
         self.assertTrue(os.path.exists('dataset/metadata/library.json'))
 
