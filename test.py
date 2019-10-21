@@ -1,11 +1,11 @@
-from xenocanto import metadata, download, gen_meta, purge
+from xenocanto import metadata, download, gen_meta, purge, delete
 from urllib import request
 import unittest
 import shutil
 import os
 
 
-# TODO: Mock objects to retain single unit responsiblity for each test
+# TODO: Mock objects and test calls
 class TestCases(unittest.TestCase):
 
 
@@ -47,6 +47,22 @@ class TestCases(unittest.TestCase):
         self.assertTrue(os.path.exists('dataset/metadata/library.json'))
 
 
+    # Check if deleting files using multiple filters
+    def test_delete(self):
+        download(['Bearded Bellbird', 'q:A', 'cnt:Brazil'])
+        delete(['id:493159', 'id:427845'])
+        self.assertFalse(os.path.exists('dataset/audio/BeardedBellbird/493159.mp3'))
+        self.assertFalse(os.path.exists('dataset/audio/BeardedBellbird/427845.mp3'))
+
+
+    # Check if deleting files from multiple folders
+    def test_delete_multiple_species(self):
+        download(['Bearded Bellbird', 'q:A', 'cnt:Brazil'])
+        download(['gen:Otis'])
+        delete(['id:493159', 'gen:Otis'])
+        self.assertFalse(os.path.exists('dataset/audio/BeardedBellbird/493159.mp3'))
+        self.assertFalse(os.path.exists('dataset/audio/GreatBustard/'))
+
     # Check if metadata is being correctly generated when some metadata is saved
     # and some must be retrieved from an API call
     def test_gen_meta_with_extra_tracks(self):
@@ -64,7 +80,3 @@ class TestCases(unittest.TestCase):
             shutil.rmtree('dataset/')
         except OSError:
             pass
-
-if __name__ == '__main__':
-    t = TestCases()
-    t.test_gen_meta_with_extra_tracks()

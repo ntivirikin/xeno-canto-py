@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 from urllib import request, error
 import sys
 import shutil
@@ -15,10 +17,12 @@ def metadata(filt):
     for f in filt:
         scrubbed = (f.replace(' ', '')).replace(':', '_')
         filt_path.append(scrubbed)
+    
     filt_url = list()
     for f in filt:
         scrubbed = f.replace(' ', '%20')
         filt_url.append(scrubbed)
+
     path = 'dataset/metadata/' + '&'.join(filt_path)
     if not os.path.exists(path):
         os.makedirs(path)
@@ -80,9 +84,67 @@ def listdir_nohidden(path):
         if not f.startswith('.'):
             yield f
 
+
+# Removes audio folders containing num or less than num files
+def purge(num):
+    path = 'dataset/audio/'
+    dirs = listdir_nohidden(path)
+    for fold in dirs:
+        fold_path = path + fold
+        count = sum(1 for _ in listdir_nohidden(fold_path))
+        if count < num:
+            shutil.rmtree(fold_path)
+
+
+def delete(filt):
+
+    # Generating list of current tracks with metadata
+    gen_meta()
+
+    # Separating desired tags from values for parsing
+    tags = list()
+    vals = list()
+    for f in filt:
+        tag = f.split(':')[0]
+        tags.append(tag)
+
+        val = f.split(':')[1]
+        if tag == 'en':
+            val = val.replace('_', ' ')
+        vals.append(val)
+
+    with open('dataset/metadata/library.json', 'r') as jsonfile:
+        data = jsonfile.read()
+    data = json.loads(data)
+
+    # Creating a set of track id's to delete
+    track_del = set()
+    for i in range(int(data['recordingNumber'])):
+        for j in range(len(tags)):
+            if data['tracks'][i][str(tags[j])] == str(vals[j]):
+                track_del.add(int(data['tracks'][i]['id']))
+
+    # Checking audio folders for tracks to delete
+    path = 'dataset/audio/'
+    dirs = listdir_nohidden(path)
+    for fold in dirs:
+        fold_path = path + fold
+        tracks = listdir_nohidden(fold_path)
+        for tr in tracks:
+            if int(tr.split('.')[0]) in track_del:
+                os.remove(fold_path + '/' + str(tr))
+
+    # Removing any empty folders
+    purge(1)
+
+
 # Generate a metadata file for given library path
 def gen_meta(path='dataset/audio/'):
-    
+
+    # Removing old library file if exists
+    if os.path.exists(path + 'library.json'):
+        os.remove(path + 'library.json')
+
     # Create a list of track ID's contained in the current library
     id_list = set()
 
@@ -101,7 +163,8 @@ def gen_meta(path='dataset/audio/'):
     # Create a list of all metadata files
     meta_files = list()
     for filename in listdir_nohidden('dataset/metadata/'):
-        meta_files.append(filename)
+        if filename != 'library.json':
+            meta_files.append(filename)
     
     # Check each metadata track for presence in library
     found_files = set()
@@ -128,14 +191,15 @@ def gen_meta(path='dataset/audio/'):
     # Retrieves information from  API for tracks that cannot be found in the 
     # currently saved metadata
     found_files = list()
-    for i in range(count):
+    for i in range(len(write_data['tracks'])):
         found_files.append(write_data['tracks'][i]['id'])
     
     not_found = list(set(id_list) - set(found_files))
     
     for i in not_found:
-        path = metadata('nr:' + i)
-        with open(path) as jsonfile:
+        track_find = 'nr:' + i
+        path = metadata([track_find])
+        with open(path + '/page1.json') as jsonfile:
             data = jsonfile.read()
         data = json.loads(data)
         write_data['tracks'].append(data['recordings'][0])
@@ -144,16 +208,6 @@ def gen_meta(path='dataset/audio/'):
         json.dump(write_data, outfile)
 
     os.rename('data.txt', 'dataset/metadata/library.json')
-    
-# Removes audio folders containing num or less than num files
-def purge(num):
-    path = 'dataset/audio/'
-    dirs = listdir_nohidden(path)
-    for fold in dirs:
-        fold_path = path + fold
-        count = sum(1 for _ in listdir_nohidden(fold_path))
-        if count <= num:
-            shutil.rmtree(fold_path)
 
 
 # Handles command line execution
@@ -164,14 +218,21 @@ if __name__ == '__main__':
  
     if act == "-m":
         metadata(params)
+
     elif act == "-dl":
         download(params)
+
     elif act == "-p":
         purge(int(params[0]))
+
     elif act == "-g":
         if len(params) == 1:
             gen_meta(params[0])
         else:
             gen_meta()
+
+    elif act == '-d':
+        delete(params)
+            
     else:
         print("The command entered was not found, please consult the README for instructions and available commands.")
