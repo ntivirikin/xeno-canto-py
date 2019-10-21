@@ -1,4 +1,5 @@
 from urllib import request, error
+import sys
 import shutil
 import json
 import os
@@ -153,3 +154,24 @@ def purge(num):
         count = sum(1 for _ in listdir_nohidden(fold_path))
         if count <= num:
             shutil.rmtree(fold_path)
+
+
+# Handles command line execution
+if __name__ == '__main__':
+    
+    act = sys.argv[1]
+    params = sys.argv[2:]
+ 
+    if act == "-m":
+        metadata(params)
+    elif act == "-dl":
+        download(params)
+    elif act == "-p":
+        purge(int(params[0]))
+    elif act == "-g":
+        if len(params) == 1:
+            gen_meta(params[0])
+        else:
+            gen_meta()
+    else:
+        print("The command entered was not found, please consult the README for instructions and available commands.")

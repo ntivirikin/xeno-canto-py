@@ -46,6 +46,7 @@ class TestCases(unittest.TestCase):
         gen_meta()
         self.assertTrue(os.path.exists('dataset/metadata/library.json'))
 
+
     # Check if metadata is being correctly generated when some metadata is saved
     # and some must be retrieved from an API call
     def test_gen_meta_with_extra_tracks(self):
@@ -63,4 +64,7 @@ class TestCases(unittest.TestCase):
             shutil.rmtree('dataset/')
         except OSError:
             pass
-    
+
+if __name__ == '__main__':
+    t = TestCases()
+    t.test_gen_meta_with_extra_tracks()
