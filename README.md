@@ -23,7 +23,7 @@ Commands through the terminal are given in the following format:
 ```
 -m 	[filters]	Metadata generation
 
--dl [filters] 	Download recordings
+-dl 	[filters] 	Download recordings
 
 -d 	[filters]	Delete recordings
 
