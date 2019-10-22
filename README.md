@@ -27,11 +27,9 @@ Commands through the terminal are given in the following format:
 
 -d 	[filters]	Delete recordings
 
--p 	[num] 		Purge folders containing num or fewer
-				recordings
+-p 	[num] 		Purge folders containing num or fewer recordings
 
--g 	[path] 		Generate metadata for provided library 
-				path (defaults to 'dataset/audio/')
+-g 	[path] 		Generate metadata for provided library path (defaults to 'dataset/audio/')
 ```
 ```filters``` are given in tag:value form in accordance with the API search guidelines. For help in building search terms, consult the [xeno-canto API guide](https://www.xeno-canto.org/article/153). The only exception is when providing English bird names as an argument to the ```-d``` command, which must be preceded with ```en:``` and have all spaces be replaced with underscores.
 
