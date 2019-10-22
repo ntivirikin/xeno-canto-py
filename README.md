@@ -1,71 +1,48 @@
 # xeno-canto API Wrapper
-
 xeno-canto-py is an API wrapper designed to help users easily download xeno-canto.org recordings and associated information.
 
 Originally created to aid in data collection and filtering for the training of machine learning models.
 
 ## Installation
+Navigate to your desired file location in a terminal and then clone the repository with the following command:
+```bash
+git clone https://github.com/ntivirikin/xeno-canto-py
+```
+The only file required for operation is the ```xenocanto.py``` file, so feel free to remove the others or move ```xenocanto.py``` to another working directory.
 
-Use the package manager [pip](https://pip.pypa.io/en/stable/) to install xeno-canto-py, or copy and paste the ```xenocanto.py``` file into your working directory.
-
+You may also use the package manager [pip](https://pip.pypa.io/en/stable/) to install xeno-canto-py to include in your Python projects.
 ```bash
 pip install xeno-canto
 ```
 
 ## Usage
-
-```get_json``` and ```get_mp3``` can be used to retrieve the JSON file and recordings from a query. Queries must be made according to the conventions detailed on the xeno-canto.org API search tips page found [here](https://www.xeno-canto.org/help/search).
-
-The following commands will retrieve the query information for the genus *Otis* through ```get_json``` and then the recordings through ```get_mp3```. Both functions will return a list of file paths to the newly saved files for further use if required.
-
-```python
-import xenocanto
-
-
-json_list = xenocanto.get_json(['gen:Otis'])
-mp3_list = xenocanto.get_mp3(json_list)
+Commands through the terminal are given in the following format:
+```bash
+python3 xenocanto.py -action args
 ```
-
-```get_rec``` calls ```get_json``` with the provided query and immediately  calls ```get_mp3``` afterwards.
-
-The following command will produce the same result as above.
-
-```python
-import xenocanto
-
-xenocanto.get_rec(['gen:Otis'])
+Possible actions and their required inputs:
 ```
-
-This will generate two folders, ```queries``` and ```recordings``` which will contain the JSON files with query data and recordings as MP3 files respectively.
-
-The following will generate metadata in JSON form for machine learning models, assuming we are using the default recordings directory in the project folder. ```gen_meta``` will also accept a custom path if your recording library is located elsewhere.
-
-```python
-import xenocanto
-
-xenocanto.gen_meta()
+-m			Metadata generation
+-dl			Download recordings
+-d			Delete recordings based on 
+-p	[num]	Purge folders containing num or fewer 
+			recordings
+-g	[path]	Generate metadata for provided library path 
+			(defaults to 'dataset/audio/')
 ```
+For help in building search terms, consult the [xeno-canto API guide](https://www.xeno-canto.org/article/153).
 
-Metadata is saved to the local directory as ```metadata.json``` formatted as shown below.
-
-```json
-{["list":{"id":1, "label":value}]}
+Example of a workflow is given below with comments:
+```bash
+# Downloading all the metadata for recordings with 
+# 'gen' equal to 'Otis'
+python3 xenocanto.py -m gen:Otis
 ```
-## Roadmap
-
-* Add filtering of ```recordings``` folders (mainly by quality and background species)
-* Add entrypoints for easier use
-
-I am always open to suggestions for features!
-
 ## Contributing
-
 All pull requests are welcome! If any issues are found, please do not hesitate to bring them to my attention.
 
 ## Acknowledgements
-
 Thank you to the team at xeno-canto.org and all its contributors for putting together such an amazing database.
 
 ## License
-
 [MIT](https://choosealicense.com/licenses/mit/)
