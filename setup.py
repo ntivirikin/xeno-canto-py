@@ -11,4 +11,5 @@ setup(
     author_email='n.tivirikin@gmail.com',
     license="MIT",
     py_modules=['xenocanto'],
+    entry_points={"console_scripts": ["xeno-canto = xenocanto:main"]},
 )
