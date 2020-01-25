@@ -210,9 +210,7 @@ def gen_meta(path='dataset/audio/'):
     os.rename('data.txt', 'dataset/metadata/library.json')
 
 
-# Handles command line execution
-if __name__ == '__main__':
-    
+def main():
     act = sys.argv[1]
     params = sys.argv[2:]
  
@@ -236,3 +234,8 @@ if __name__ == '__main__':
             
     else:
         print("The command entered was not found, please consult the README for instructions and available commands.")
+
+
+# Handles command line execution
+if __name__ == '__main__':
+    main()
