@@ -18,6 +18,10 @@ Then import the module:
 ```python
 import xenocanto
 ```
+Or use it straight from the command line:
+```bash
+xeno-canto -dl Bearded Bellbird
+```
 ## Usage
 Commands through the terminal are given in the following format:
 ```
@@ -36,21 +40,21 @@ Commands through the terminal are given in the following format:
 Examples of command usage are given below:
 ```bash
 # Retrieving metadata
-python xenocanto.py -m Bearded Bellbird q:A
+xeno-canto -m Bearded Bellbird q:A
 
 # Downloading recordings
-python xenocanto.py -dl Bearded Bellbird cnt:Brazil
+xeno-canto -dl Bearded Bellbird cnt:Brazil
 
 # Delete recordings with ANY of specified criteria from
 # library
-python xenocanto.py -d q:D cnt:Brazil
+xeno-canto -d q:D cnt:Brazil
 
 # Purge folders with less than 10 recordings
-python xenocanto.py -p 10
+xeno-canto -p 10
 
 # Generate metadata for all recordings in the path
 # (defaults to 'dataset/audio/')
-python xenocanto.py -g
+xeno-canto -g
 ```
 ## Contributing
 All pull requests are welcome! If any issues are found, please do not hesitate to bring them to my attention.
