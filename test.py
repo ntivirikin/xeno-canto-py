@@ -5,7 +5,9 @@ import shutil
 import os
 
 
-# TODO: Mock objects and test calls
+# TODO: 
+#   [ ] Mock objects and test calls
+#   [ ] Test resuming a download after interrupt
 class TestCases(unittest.TestCase):
 
 

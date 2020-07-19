@@ -5,7 +5,21 @@ import sys
 import shutil
 import json
 import os
+import ssl
 
+# TODO: 
+#   [ ] Log messages to console
+#   [ ] Add ability to recognize the area where last download stopped
+#   [ ] Add sono image download capabilities
+#   [ ] Display tables of tags collected
+#
+# FIXME:
+#   [ ] Fix naming of folders in audio and metadata to be more consistent
+#   [X] Fix SSL certificate errors
+#   [ ] Fix bug that stops downloading when file is already present
+
+# Disable certificate verification 
+ssl._create_default_https_context = ssl._create_unverified_context
 
 # Retrieves metadata for requested recordings in the form of a JSON file
 def metadata(filt):
@@ -38,6 +52,7 @@ def metadata(filt):
         except error.HTTPError as e:
             print('An error has occurred: ' + str(e))
             exit()
+        print("Downloading metadate page " + str(page) + "...")
         data = json.loads(r.read().decode('UTF-8'))
         filename = path + '/page' + str(page) + '.json'
         with open(filename, 'w') as saved:
@@ -55,14 +70,18 @@ def download(filt):
     page_num = 1
 
     # Retrieve metadata to parse for download links
+    print("Downloading metadata for search query...")
     path = metadata(filt)
+    with open(path + '/page' + str(page) + ".json", 'r') as jsonfile:
+        data = jsonfile.read()
+    data = json.loads(data)
+    page_num = data['numPages']
     while page < page_num + 1:
-        with open(path + '/page' + str(page) + ".json", 'r') as jsonfile:
-            data = jsonfile.read()
-        data = json.loads(data)
-        page_num = data['numPages']
 
         # Pulling species name, track ID, and download link for naming and retrieval
+        # while i < range(len)
+
+
         for i in range(len((data['recordings']))):
             url = 'http:' + data['recordings'][i]['file']
             name = (data['recordings'][i]['en']).replace(' ', '')
@@ -75,6 +94,7 @@ def download(filt):
             # If the file exists in the directory, we will skip it
             elif os.path.exists(audio_path + audio_file):
                 break
+            print("Downloading " + track_id + ".mp3...")
             request.urlretrieve(url, audio_path + audio_file)
         page += 1
 
