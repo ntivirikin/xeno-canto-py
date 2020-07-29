@@ -3,3 +3,5 @@ v1.0.1, March 13, 2019 -- Refactor to PEP8 standards, add comments.
 v1.0.2, March 18, 2019 -- Update package name in README.
 v1.1, March 30, 2019 -- Added metadata generation.
 v2.0, October 21, 2019 -- Added purge, delete, and execution via command line arguments.
+v2.0.1, March 15, 2020 -- Installed command-line tool from pull request.
+v2.0.2, July 29, 2020 -- Fixed SSL certificate error and fixed using double quote operator in arguments.
