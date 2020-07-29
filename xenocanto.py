@@ -8,7 +8,7 @@ import os
 import ssl
 
 # TODO: 
-#   [ ] Log messages to console
+#   [/] Log messages to console
 #   [ ] Add ability to recognize the area where last download stopped
 #   [ ] Add sono image download capabilities
 #   [ ] Display tables of tags collected
@@ -16,33 +16,31 @@ import ssl
 # FIXME:
 #   [ ] Fix naming of folders in audio and metadata to be more consistent
 #   [X] Fix SSL certificate errors
-#   [ ] Fix bug that stops downloading when file is already present
+#   [ ] Fix stopping download when file present
+#   [X] Fix using matches operator with tags (e.g. cnt:"United States")
 
-# Disable certificate verification 
+# Disable certificate verification
 ssl._create_default_https_context = ssl._create_unverified_context
 
 # Retrieves metadata for requested recordings in the form of a JSON file
 def metadata(filt):
     page = 1
     page_num = 1
+    filt_path = list()
+    filt_url = list()
+    print("Retrieving metadata...")
 
     # Scrubbing input for file name and url
-    filt_path = list()
     for f in filt:
-        scrubbed = (f.replace(' ', '')).replace(':', '_')
-        filt_path.append(scrubbed)
-    
-    filt_url = list()
-    for f in filt:
-        scrubbed = f.replace(' ', '%20')
-        filt_url.append(scrubbed)
+        filt_url.append(f.replace(' ', '%20'))
+        filt_path.append((f.replace(' ', '')).replace(':', '_').replace("\"",""))
 
-    path = 'dataset/metadata/' + '&'.join(filt_path)
-    if not os.path.exists(path):
-        os.makedirs(path)
-    else:
+    path = 'dataset/metadata/' + ''.join(filt_path)
+
+    # Overwrite metadata query folder 
+    if os.path.exists(path):
         shutil.rmtree(path)
-        os.makedirs(path)
+    os.makedirs(path)
 
     # Save all pages of the JSON response    
     while page < page_num + 1:
@@ -68,14 +66,15 @@ def metadata(filt):
 def download(filt):
     page = 1
     page_num = 1
+    print("Downloading all recordings for query...")
 
     # Retrieve metadata to parse for download links
-    print("Downloading metadata for search query...")
     path = metadata(filt)
     with open(path + '/page' + str(page) + ".json", 'r') as jsonfile:
         data = jsonfile.read()
     data = json.loads(data)
     page_num = data['numPages']
+    print("Found " + str(data['numRecordings']) + " recordings for given query, downloading...") 
     while page < page_num + 1:
 
         # Pulling species name, track ID, and download link for naming and retrieval
