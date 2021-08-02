@@ -92,7 +92,7 @@ def download(filt):
 
             # If the file exists in the directory, we will skip it
             elif os.path.exists(audio_path + audio_file):
-                break
+                continue
             print("Downloading " + track_id + ".mp3...")
             request.urlretrieve(url, audio_path + audio_file)
         page += 1
