@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+
 from urllib import request, error
 import sys
 import shutil
@@ -9,15 +10,17 @@ import ssl
 
 # TODO: 
 #   [/] Log messages to console
-#   [ ] Add ability to recognize the area where last download stopped
+#   [X] Add ability to recognize the area where last download stopped
+#   [ ] Purge recordings that did not complete download
 #   [ ] Add sono image download capabilities
 #   [ ] Display tables of tags collected
 #
 # FIXME:
-#   [ ] Fix naming of folders in audio and metadata to be more consistent
+#   [X] Fix naming of folders in audio and metadata to be more consistent
 #   [X] Fix SSL certificate errors
-#   [ ] Fix stopping download when file present
+#   [X] Fix stopping download when file present
 #   [X] Fix using matches operator with tags (e.g. cnt:"United States")
+#   [ ] Allow the delete method to accept species names with spaces
 
 # Disable certificate verification
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -38,9 +41,8 @@ def metadata(filt):
     path = 'dataset/metadata/' + ''.join(filt_path)
 
     # Overwrite metadata query folder 
-    if os.path.exists(path):
-        shutil.rmtree(path)
-    os.makedirs(path)
+    if not os.path.exists(path):
+        os.makedirs(path)
 
     # Save all pages of the JSON response    
     while page < page_num + 1:
@@ -70,6 +72,24 @@ def download(filt):
 
     # Retrieve metadata to parse for download links
     path = metadata(filt)
+
+    # Enumerate list of metadata folders
+    path_list = listdir_nohidden("dataset/metadata/")
+    redown = set()
+    
+    # Check for any in_progress files in the metadata folders
+    for p in path_list:
+        check_path = "dataset/metadata/" + str(p)
+        if os.path.isfile(check_path):
+            continue
+
+        if os.path.exists(check_path + "/in_progress.txt"):
+            curr = open(check_path + "/in_progress.txt")
+            line = int(curr.readline())
+            if line not in redown:
+                redown.add(line)
+            curr.close()
+
     with open(path + '/page' + str(page) + ".json", 'r') as jsonfile:
         data = jsonfile.read()
     data = json.loads(data)
@@ -77,25 +97,42 @@ def download(filt):
     print("Found " + str(data['numRecordings']) + " recordings for given query, downloading...") 
     while page < page_num + 1:
 
-        # Pulling species name, track ID, and download link for naming and retrieval
-        # while i < range(len)
-
-
         for i in range(len((data['recordings']))):
             url = 'http:' + data['recordings'][i]['file']
             name = (data['recordings'][i]['en']).replace(' ', '')
             track_id = data['recordings'][i]['id']
+
+            # Keep track of the most recently downloaded file
+            recent = open(path + "/in_progress.txt", "w")
+            recent.write(str(track_id))
+            recent.write("\n")
+            recent.close()
+
             audio_path = 'dataset/audio/' + name + '/'
-            audio_file = track_id + '.mp3'
+            audio_file = str(track_id) + '.mp3'
+
+            # If the track has been included in the progress files, it can be corrupt and must be redownloaded regardless
+            if int(track_id) in redown:
+                print("File " + str(track_id) + ".mp3 must be redownloaded since it was not completed during a previous query.")
+                print("Downloading " + str(track_id) + ".mp3")
+                request.urlretrieve(url, audio_path + audio_file)
+                continue
+
             if not os.path.exists(audio_path):
                 os.makedirs(audio_path)
 
             # If the file exists in the directory, we will skip it
-            elif os.path.exists(audio_path + audio_file):
+            if os.path.exists(audio_path + audio_file):
+                print("File " + str(track_id) + ".mp3 is already present. Moving on to the next recording...")
                 continue
-            print("Downloading " + track_id + ".mp3...")
+
+            print("Downloading " + str(track_id) + ".mp3...")
             request.urlretrieve(url, audio_path + audio_file)
+
         page += 1
+
+        # If the method has completed successfully, then we can delete the in_progress file
+        os.remove(path + "/in_progress.txt")
 
 # Retrieve all files while ignoring those that are hidden
 def listdir_nohidden(path):
@@ -112,6 +149,7 @@ def purge(num):
         fold_path = path + fold
         count = sum(1 for _ in listdir_nohidden(fold_path))
         if count < num:
+            print("Folder at " + fold_path + " has fewer than " + num + " recordings. Deleting...")
             shutil.rmtree(fold_path)
 
 
@@ -143,15 +181,21 @@ def delete(filt):
             if data['tracks'][i][str(tags[j])] == str(vals[j]):
                 track_del.add(int(data['tracks'][i]['id']))
 
+    print(str(len(track_del)) + " tracks have been identified to be deleted.")
+
     # Checking audio folders for tracks to delete
     path = 'dataset/audio/'
     dirs = listdir_nohidden(path)
+    removed = 0
     for fold in dirs:
         fold_path = path + fold
         tracks = listdir_nohidden(fold_path)
         for tr in tracks:
             if int(tr.split('.')[0]) in track_del:
                 os.remove(fold_path + '/' + str(tr))
+                removed = removed + 1
+
+    print(str(removed) + " tracks deleted!")
 
     # Removing any empty folders
     purge(1)
@@ -249,7 +293,9 @@ def main():
             gen_meta()
 
     elif act == '-d':
-        delete(params)
+        dec = input("Are you sure you want to proceed with deleting? (Y or N)\n")
+        if dec == "Y":
+            delete(params)
             
     else:
         print("The command entered was not found, please consult the README for instructions and available commands.")
