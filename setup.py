@@ -11,5 +11,7 @@ setup(
     author_email='n.tivirikin@gmail.com',
     license="MIT",
     py_modules=['xenocanto'],
+    install_requires=["tqdm"],
+    python_requires=">=3.7",
     entry_points={"console_scripts": ["xeno-canto = xenocanto:main"]},
 )
