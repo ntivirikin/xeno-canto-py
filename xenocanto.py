@@ -98,7 +98,7 @@ def download(filt):
     while page < page_num + 1:
 
         for i in range(len((data['recordings']))):
-            url = 'http:' + data['recordings'][i]['file']
+            url = data['recordings'][i]['file']
             name = (data['recordings'][i]['en']).replace(' ', '')
             track_id = data['recordings'][i]['id']
 
