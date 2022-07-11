@@ -21,7 +21,7 @@ class TestCases(unittest.TestCase):
     # Checks if metadata is successfully downloaded into the expected folder structure
     def test_metadata(self):
         metadata(['Bearded Bellbird', 'q:A'])
-        self.assertTrue(os.path.exists('dataset/metadata/BeardedBellbird&q_A/page1.json'))
+        self.assertTrue(os.path.exists('dataset/metadata/BeardedBellbirdq_A/page1.json'))
 
 
     # Checks if audio files are downloaded into the correct directory
@@ -52,6 +52,8 @@ class TestCases(unittest.TestCase):
     # Check if deleting files using multiple filters
     def test_delete(self):
         download(['Bearded Bellbird', 'q:A', 'cnt:Brazil'])
+        self.assertTrue(os.path.exists('dataset/audio/BeardedBellbird/493159.mp3'))
+        self.assertTrue(os.path.exists('dataset/audio/BeardedBellbird/427845.mp3'))
         delete(['id:493159', 'id:427845'])
         self.assertFalse(os.path.exists('dataset/audio/BeardedBellbird/493159.mp3'))
         self.assertFalse(os.path.exists('dataset/audio/BeardedBellbird/427845.mp3'))
@@ -60,7 +62,9 @@ class TestCases(unittest.TestCase):
     # Check if deleting files from multiple folders
     def test_delete_multiple_species(self):
         download(['Bearded Bellbird', 'q:A', 'cnt:Brazil'])
+        self.assertTrue(os.path.exists('dataset/audio/BeardedBellbird/493159.mp3'))
         download(['gen:Otis'])
+        self.assertTrue(os.path.exists('dataset/audio/GreatBustard/'))
         delete(['id:493159', 'gen:Otis'])
         self.assertFalse(os.path.exists('dataset/audio/BeardedBellbird/493159.mp3'))
         self.assertFalse(os.path.exists('dataset/audio/GreatBustard/'))

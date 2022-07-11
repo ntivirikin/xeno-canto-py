@@ -6,24 +6,16 @@ import sys
 import shutil
 import json
 import os
-import ssl
 
 # TODO: 
 #   [/] Log messages to console
-#   [X] Add ability to recognize the area where last download stopped
 #   [ ] Purge recordings that did not complete download
 #   [ ] Add sono image download capabilities
 #   [ ] Display tables of tags collected
 #
 # FIXME:
-#   [X] Fix naming of folders in audio and metadata to be more consistent
-#   [X] Fix SSL certificate errors
-#   [X] Fix stopping download when file present
-#   [X] Fix using matches operator with tags (e.g. cnt:"United States")
 #   [ ] Allow the delete method to accept species names with spaces
 
-# Disable certificate verification
-ssl._create_default_https_context = ssl._create_unverified_context
 
 # Retrieves metadata for requested recordings in the form of a JSON file
 def metadata(filt):
@@ -61,6 +53,7 @@ def metadata(filt):
         page += 1
 
     # Return the path to the folder containing downloaded metadata
+    print('Metadata retrieval completed.')
     return path
 
 
@@ -114,7 +107,6 @@ def download(filt):
             # If the track has been included in the progress files, it can be corrupt and must be redownloaded regardless
             if int(track_id) in redown:
                 print("File " + str(track_id) + ".mp3 must be redownloaded since it was not completed during a previous query.")
-                print("Downloading " + str(track_id) + ".mp3")
                 request.urlretrieve(url, audio_path + audio_file)
                 continue
 
@@ -126,7 +118,6 @@ def download(filt):
                 print("File " + str(track_id) + ".mp3 is already present. Moving on to the next recording...")
                 continue
 
-            print("Downloading " + str(track_id) + ".mp3...")
             request.urlretrieve(url, audio_path + audio_file)
 
         page += 1
@@ -149,7 +140,7 @@ def purge(num):
         fold_path = path + fold
         count = sum(1 for _ in listdir_nohidden(fold_path))
         if count < num:
-            print("Folder at " + fold_path + " has fewer than " + num + " recordings. Deleting...")
+            print("Folder at " + fold_path + " has fewer than " + str(num) + " recordings. Deleting...")
             shutil.rmtree(fold_path)
 
 
