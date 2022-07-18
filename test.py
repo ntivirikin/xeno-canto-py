@@ -69,6 +69,7 @@ class TestCases(unittest.TestCase):
         self.assertFalse(os.path.exists('dataset/audio/BeardedBellbird/493159.mp3'))
         self.assertFalse(os.path.exists('dataset/audio/GreatBustard/'))
 
+
     # Check if metadata is being correctly generated when some metadata is saved
     # and some must be retrieved from an API call
     def test_gen_meta_with_extra_tracks(self):

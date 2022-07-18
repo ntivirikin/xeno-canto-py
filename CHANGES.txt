@@ -15,3 +15,6 @@ v2.0.3	Jul 11, 2022		-- Decreased number of console messages when downloading.
 							-- Fixed download error due to switch to HTTPS.
 							-- Fixed print error with concatenation of str and int in purge function.
 							-- Fixed expected naming scheme in assertion of test cases.
+v2.0.4 Jul 18, 2022 		-- Added method for generating links from metadata in preparation for async implementation.
+							-- Fixed issue where 1st page of recordings was continuosly redownloaded if more than one page was present.
+							-- Fixed typo in metadata console messages.
