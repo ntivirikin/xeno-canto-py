@@ -7,16 +7,18 @@ import shutil
 import json
 import os
 
+
 # TODO: 
 #   [/] Log messages to console
-#   [ ] Create list_urls(path) function
+#   [X] Create list_urls(path) function
+#   [ ] Add concurrent execution of recording downloads using asyncio
 #   [ ] Purge recordings that did not complete download
 #   [ ] Add sono image download capabilities
 #   [ ] Display tables of tags collected
 #
 # FIXME:
 #   [ ] Allow the delete method to accept species names with spaces
-#   [ ] Fix recordings not being downloaded beyond first page of JSON metadata
+#   [X] Fix recordings not being downloaded beyond first page of JSON metadata
 
 
 # Retrieves metadata for requested recordings in the form of a JSON file
@@ -99,10 +101,40 @@ def list_urls(path):
         page += 1
     return url_list
 
-# Retrieves metadata and audio recordings
-def download(filt):
-    print("Downloading all recordings for query...")
 
+# Process an entry from the recording URL list
+def down_one(track_tuple, meta_path, inprogress_list):
+    name = str(track_tuple[0])
+    track_id = track_tuple[1]
+    url = track_tuple[2]
+
+    # Keep track of the most recently downloaded file
+    recent = open(meta_path + "/in_progress.txt", "w")
+    recent.write(str(track_id))
+    recent.write("\n")
+    recent.close()
+
+    audio_path = 'dataset/audio/' + name + '/'
+    audio_file = str(track_id) + '.mp3'
+
+    if int(track_id) in inprogress_list:
+        print("File " + str(track_id) + ".mp3 must be redownloaded since it was not completed during a previous query.")
+        request.urlretrieve(url, audio_path + audio_file)
+
+    if not os.path.exists(audio_path):
+        os.makedirs(audio_path)
+
+    # If the file exists in the directory, we will skip it
+    if os.path.exists(audio_path + audio_file):
+        print("File " + str(track_id) + ".mp3 is already present. Moving on to the next recording...")
+
+    request.urlretrieve(url, audio_path + audio_file)
+    # await asyncio.sleep(1)
+
+
+# Retrieves metadata and recordings in a CONCURRENT manner
+def download(filt):
+    
     # Retrieve list of download links
     path_listurls = metadata(filt)
     parse_list = list_urls(path_listurls)
@@ -125,41 +157,15 @@ def download(filt):
             curr.close()
 
     recordings_num = parse_list[0]
-    print("Found " + str(recordings_num) + " recordings for given query, downloading...") 
-
+    print("Found " + str(recordings_num) + " recordings for given query, downloading...")
+    
+    # Process the generated list of URLs using a separate function
     for i in range(0, int(recordings_num)):
-        name = parse_list[1][i][0]
-        track_id = parse_list[1][i][1]
-        url = parse_list[1][i][2]
-            
-        # Keep track of the most recently downloaded file
-        recent = open(path_listurls + "/in_progress.txt", "w")
-        recent.write(str(track_id))
-        recent.write("\n")
-        recent.close()
-
-        audio_path = 'dataset/audio/' + name + '/'
-        audio_file = str(track_id) + '.mp3'
-
-        # If the track has been included in the progress files, it can be corrupt and must be redownloaded regardless
-        if int(track_id) in redown:
-            print("File " + str(track_id) + ".mp3 must be redownloaded since it was not completed during a previous query.")
-            request.urlretrieve(url, audio_path + audio_file)
-            continue
-
-        if not os.path.exists(audio_path):
-            os.makedirs(audio_path)
-
-        # If the file exists in the directory, we will skip it
-        if os.path.exists(audio_path + audio_file):
-            print("File " + str(track_id) + ".mp3 is already present. Moving on to the next recording...")
-            continue
-
-        request.urlretrieve(url, audio_path + audio_file)
-
+        down_one(parse_list[1][i], path_listurls, redown)
 
     # If the method has completed successfully, then we can delete the in_progress file
     os.remove(path_listurls + "/in_progress.txt")
+
 
 # Retrieve all files while ignoring those that are hidden
 def listdir_nohidden(path):
@@ -180,6 +186,7 @@ def purge(num):
             shutil.rmtree(fold_path)
 
 
+# Deletes audio tracks based on provided parameters
 def delete(filt):
 
     # Generating list of current tracks with metadata
