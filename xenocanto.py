@@ -2,23 +2,27 @@
 
 
 from urllib import request, error
+import asyncio
 import sys
 import shutil
 import json
 import os
+import time
+
+import aiohttp
+import aiofiles
 
 
 # TODO: 
 #   [/] Log messages to console
-#   [X] Create list_urls(path) function
-#   [ ] Add concurrent execution of recording downloads using asyncio
+#   [X] Add concurrent execution of recording downloads using asyncio
+#   [ ] Create function to verify all recordings downloaded correctly
 #   [ ] Purge recordings that did not complete download
 #   [ ] Add sono image download capabilities
 #   [ ] Display tables of tags collected
 #
 # FIXME:
 #   [ ] Allow the delete method to accept species names with spaces
-#   [X] Fix recordings not being downloaded beyond first page of JSON metadata
 
 
 # Retrieves metadata for requested recordings in the form of a JSON file
@@ -36,12 +40,12 @@ def metadata(filt):
 
     path = 'dataset/metadata/' + ''.join(filt_path)
 
-    # Overwrite metadata query folder 
+    # Create a metadata folder if it does not exist already
     if not os.path.exists(path):
         os.makedirs(path)
 
-    # Save all pages of the JSON response    
-    while page < page_num + 1:
+    # Save all pages of the JSON response
+    while page < (page_num + 1):
         url = 'https://www.xeno-canto.org/api/2/recordings?query={0}&page={1}'.format('%20'.join(filt_url), page)
         try:
             r = request.urlopen(url)
@@ -62,6 +66,7 @@ def metadata(filt):
 
 
 # Uses JSON metadata files to generate a list of recording URLs for easier processing by download(filt)
+# TODO: Refactor this so the function saves the first page when retrieving recordings_num and page_num
 def list_urls(path):
     url_list = []
     page = 1
@@ -102,69 +107,57 @@ def list_urls(path):
     return url_list
 
 
-# Process an entry from the recording URL list
-def down_one(track_tuple, meta_path, inprogress_list):
-    name = str(track_tuple[0])
-    track_id = track_tuple[1]
-    url = track_tuple[2]
+# This is the client that will process the list of track information concurrently
+def chunked_http_client(num_chunks):
+    semaphore = asyncio.Semaphore(num_chunks)
 
-    # Keep track of the most recently downloaded file
-    recent = open(meta_path + "/in_progress.txt", "w")
-    recent.write(str(track_id))
-    recent.write("\n")
-    recent.close()
+    async def http_get(track_tuple, client_session):
+        nonlocal semaphore
 
-    audio_path = 'dataset/audio/' + name + '/'
-    audio_file = str(track_id) + '.mp3'
+        async with semaphore:
+            name = str(track_tuple[0])
+            track_id = str(track_tuple[1])
+            url = track_tuple[2]
 
-    if int(track_id) in inprogress_list:
-        print("File " + str(track_id) + ".mp3 must be redownloaded since it was not completed during a previous query.")
-        request.urlretrieve(url, audio_path + audio_file)
+            audio_path = 'dataset/audio/' + name + '/'
+            audio_file = track_id + '.mp3'
 
-    if not os.path.exists(audio_path):
-        os.makedirs(audio_path)
+            if not os.path.exists(audio_path):
+                os.makedirs(audio_path)
 
-    # If the file exists in the directory, we will skip it
-    if os.path.exists(audio_path + audio_file):
-        print("File " + str(track_id) + ".mp3 is already present. Moving on to the next recording...")
+            # If the file exists in the directory, we will skip it
+            if os.path.exists(audio_path + audio_file):
+                print("File " + track_id + ".mp3 is already present. Moving on to the next recording...")
+                return
 
-    request.urlretrieve(url, audio_path + audio_file)
-    # await asyncio.sleep(1)
+            async with client_session.request("GET", url) as response:
+                print("Start request at " + str(time.time()))
+                if response.status == 200:
+                        f = await aiofiles.open((audio_path + audio_file), mode='wb')
+                        await f.write(await response.content.read())
+                        await f.close()
+                else:
+                    print("Error occurred: " + str(response.status))
+                return await asyncio.sleep(0.9)
+
+    return http_get
 
 
-# Retrieves metadata and recordings in a CONCURRENT manner
-def download(filt):
-    
-    # Retrieve list of download links
-    path_listurls = metadata(filt)
-    parse_list = list_urls(path_listurls)
+# Retrieves metadata and recordings
+async def download(filt):
 
-    # Enumerate list of metadata folders
-    path_list = listdir_nohidden("dataset/metadata/")
-    redown = set()
-    
-    # Check for any in_progress files in the metadata folders
-    for p in path_list:
-        check_path = "dataset/metadata/" + str(p)
-        if os.path.isfile(check_path):
-            continue
+    # Retrieve metadata and generate list of track information
+    meta_path = metadata(filt)
+    url_list = list_urls(meta_path)
 
-        if os.path.exists(check_path + "/in_progress.txt"):
-            curr = open(check_path + "/in_progress.txt")
-            line = int(curr.readline())
-            if line not in redown:
-                redown.add(line)
-            curr.close()
-
-    recordings_num = parse_list[0]
+    recordings_num = url_list[0]
     print("Found " + str(recordings_num) + " recordings for given query, downloading...")
     
-    # Process the generated list of URLs using a separate function
-    for i in range(0, int(recordings_num)):
-        down_one(parse_list[1][i], path_listurls, redown)
-
-    # If the method has completed successfully, then we can delete the in_progress file
-    os.remove(path_listurls + "/in_progress.txt")
+    http_client = chunked_http_client(1)
+    async with aiohttp.ClientSession() as client_session:
+        tasks = [http_client(track_tuple, client_session) for track_tuple in  url_list[1]]
+        for future in asyncio.as_completed(tasks):
+            data = await future
 
 
 # Retrieve all files while ignoring those that are hidden
@@ -307,6 +300,7 @@ def gen_meta(path='dataset/audio/'):
     os.rename('data.txt', 'dataset/metadata/library.json')
 
 
+# Accepts command line input to determine function to execute
 def main():
     act = sys.argv[1]
     params = sys.argv[2:]
@@ -315,7 +309,11 @@ def main():
         metadata(params)
 
     elif act == "-dl":
-        download(params)
+        start = time.time()
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(download(params))
+        end = time.time()
+        print("Time elapsed: " + str((end - start)))
 
     elif act == "-p":
         purge(int(params[0]))

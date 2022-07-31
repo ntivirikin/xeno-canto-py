@@ -12,5 +12,8 @@ setup(
     license="MIT",
     py_modules=['xenocanto'],
     entry_points={"console_scripts": ["xeno-canto = xenocanto:main"]},
-    install_requires=[],
+    install_requires=[
+        'aiohttp',
+        'aiofiles',
+    ],
 )
