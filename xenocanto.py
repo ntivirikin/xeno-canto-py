@@ -1,24 +1,25 @@
 #!/usr/bin/python3
 
-
-from urllib import request, error
 import asyncio
-import sys
-import shutil
 import json
 import os
+import shutil
+import sys
 import time
+from urllib import request, error
 
-import aiohttp
 import aiofiles
+import aiohttp
 
 
 # TODO: 
 #   [/] Log messages to console
 #   [X] Add concurrent execution of recording downloads using asyncio
+#   [ ] Add sono image download capabilities
+#   [ ] Add ability to process multiple species in one command
 #   [ ] Create function to verify all recordings downloaded correctly
 #   [ ] Purge recordings that did not complete download
-#   [ ] Add sono image download capabilities
+#   [ ] Add text file processing for batch requests
 #   [ ] Display tables of tags collected
 #
 # FIXME:
@@ -60,18 +61,20 @@ def metadata(filt):
         page_num = data['numPages']
         page += 1
 
+        # Rate limit of one request per second
+        time.sleep(1)
+
     # Return the path to the folder containing downloaded metadata
     print('Metadata retrieval completed.')
     return path
 
 
 # Uses JSON metadata files to generate a list of recording URLs for easier processing by download(filt)
-# TODO: Refactor this so the function saves the first page when retrieving recordings_num and page_num
 def list_urls(path):
     url_list = []
     page = 1
     
-    # Initial opening of JSON to retrieve page and recording amount
+    # Initial opening of JSON to retrieve amount of pages and recordings
     with open(path + '/page' + str(page) + ".json", 'r') as jsonfile:
         data = jsonfile.read()
         jsonfile.close()
@@ -79,23 +82,26 @@ def list_urls(path):
     page_num = data['numPages']
     recordings_num = int(data['numRecordings'])
 
-    # Clear may not be required if setting to None
+    # Clear may not be required if setting to None, included for redundancy
     data.clear()
     data = None
 
-    # Set the first two elements as page and recordings amount
+    # Set the first element to the number of recordings
     url_list.append(recordings_num)
 
-    # Third element will be a list of tuples with three elements each (name, track_id, file)
+    # Second element will be a list of tuples with three elements each (name, track_id, file url)
     url_list.append(list())
+
+    # Read each metadata file and extract information into list as a tuple
     while page < page_num + 1:
         with open(path + '/page' + str(page) + '.json', 'r') as jsonfile:
             data = jsonfile.read()
             jsonfile.close()
         data = json.loads(data)
 
-        # Extract the number
+        # Extract the number of recordings in the opened metadata file
         rec_length = len(data["recordings"])
+
         # Parse through the opened data and add it to the URL list
         for i in range(0, rec_length):
             name = (data['recordings'][i]['en']).replace(' ', '')
@@ -109,28 +115,38 @@ def list_urls(path):
 
 # This is the client that will process the list of track information concurrently
 def chunked_http_client(num_chunks):
+
+    # Semaphore used to limit the number of requests with num_chunks
     semaphore = asyncio.Semaphore(num_chunks)
 
+    # Processes a tuple from the url_list using the aiohttp client_session
     async def http_get(track_tuple, client_session):
+
+        # Work with semaphore located outside the function
         nonlocal semaphore
 
         async with semaphore:
+
+            # Pull relevant info from tuple
             name = str(track_tuple[0])
             track_id = str(track_tuple[1])
             url = track_tuple[2]
 
+            # Set up the paths required for saving the audio file
             audio_path = 'dataset/audio/' + name + '/'
             audio_file = track_id + '.mp3'
 
+            # Create an audio folder for the species if it does not exist
             if not os.path.exists(audio_path):
                 os.makedirs(audio_path)
 
             # If the file exists in the directory, we will skip it
             if os.path.exists(audio_path + audio_file):
-                print("File " + track_id + ".mp3 is already present. Moving on to the next recording...")
+                print(track_id + ".mp3 is already present. Continuing...")
                 return
 
-            async with client_session.request("GET", url) as response:
+            # Use the aiohttp client_session to retrieve the audio file asynchronously
+            async with client_session.get(url) as response:
                 print("Start request at " + str(time.time()))
                 if response.status == 200:
                         f = await aiofiles.open((audio_path + audio_file), mode='wb')
@@ -138,23 +154,26 @@ def chunked_http_client(num_chunks):
                         await f.close()
                 else:
                     print("Error occurred: " + str(response.status))
-                return await asyncio.sleep(0.9)
 
     return http_get
 
 
-# Retrieves metadata and recordings
+# Retrieves metadata and recordings for a given set of input param
 async def download(filt):
 
     # Retrieve metadata and generate list of track information
     meta_path = metadata(filt)
     url_list = list_urls(meta_path)
 
+    # Retrieve the number of recordings to be downloaded
     recordings_num = url_list[0]
-    print("Found " + str(recordings_num) + " recordings for given query, downloading...")
+    print(str(recordings_num) + " recordings found, downloading...")
     
-    http_client = chunked_http_client(1)
+    # Setup the aiohttp client with the desired semaphore limit
+    http_client = chunked_http_client(5)
     async with aiohttp.ClientSession() as client_session:
+
+        # Collect the required tasks and await futures to ensure concurrent processing
         tasks = [http_client(track_tuple, client_session) for track_tuple in  url_list[1]]
         for future in asyncio.as_completed(tasks):
             data = await future
