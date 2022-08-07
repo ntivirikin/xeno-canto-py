@@ -12,7 +12,7 @@ import aiofiles
 import aiohttp
 
 
-# TODO: 
+# TODO:
 #   [/] Log messages to console
 #   [X] Add concurrent execution of recording downloads using asyncio
 #   [ ] Add sono image download capabilities
@@ -23,6 +23,7 @@ import aiohttp
 #   [ ] Display tables of tags collected
 #
 # FIXME:
+#   [X] Fix DeprecationWarning for asyncio.get_event_loop()
 #   [ ] Allow the delete method to accept species names with spaces
 
 
@@ -37,7 +38,7 @@ def metadata(filt):
     # Scrubbing input for file name and url
     for f in filt:
         filt_url.append(f.replace(' ', '%20'))
-        filt_path.append((f.replace(' ', '')).replace(':', '_').replace("\"",""))
+        filt_path.append((f.replace(' ', '')).replace(':', '_').replace("\"", ""))
 
     path = 'dataset/metadata/' + ''.join(filt_path)
 
@@ -45,9 +46,12 @@ def metadata(filt):
     if not os.path.exists(path):
         os.makedirs(path)
 
+    # Input parameters are separated by %20 for use in URL
+    query = ('%20'.join(filt_url))
+
     # Save all pages of the JSON response
     while page < (page_num + 1):
-        url = 'https://www.xeno-canto.org/api/2/recordings?query={0}&page={1}'.format('%20'.join(filt_url), page)
+        url = 'https://www.xeno-canto.org/api/2/recordings?query={0}&page={1}'.format(query, page)
         try:
             r = request.urlopen(url)
         except error.HTTPError as e:
@@ -69,11 +73,11 @@ def metadata(filt):
     return path
 
 
-# Uses JSON metadata files to generate a list of recording URLs for easier processing by download(filt)
+# Uses JSON metadata files to generate a list of recording URLs
 def list_urls(path):
     url_list = []
     page = 1
-    
+
     # Initial opening of JSON to retrieve amount of pages and recordings
     with open(path + '/page' + str(page) + ".json", 'r') as jsonfile:
         data = jsonfile.read()
@@ -89,7 +93,7 @@ def list_urls(path):
     # Set the first element to the number of recordings
     url_list.append(recordings_num)
 
-    # Second element will be a list of tuples with three elements each (name, track_id, file url)
+    # Second element will be a list of tuples with (name, track_id, file url)
     url_list.append(list())
 
     # Read each metadata file and extract information into list as a tuple
@@ -113,7 +117,7 @@ def list_urls(path):
     return url_list
 
 
-# This is the client that will process the list of track information concurrently
+# Client that processes the list of track information concurrently
 def chunked_http_client(num_chunks):
 
     # Semaphore used to limit the number of requests with num_chunks
@@ -124,7 +128,6 @@ def chunked_http_client(num_chunks):
 
         # Work with semaphore located outside the function
         nonlocal semaphore
-
         async with semaphore:
 
             # Pull relevant info from tuple
@@ -133,25 +136,24 @@ def chunked_http_client(num_chunks):
             url = track_tuple[2]
 
             # Set up the paths required for saving the audio file
-            audio_path = 'dataset/audio/' + name + '/'
-            audio_file = track_id + '.mp3'
+            folder_path = 'dataset/audio/' + name + '/'
+            file_path = folder_path + track_id + '.mp3'
 
             # Create an audio folder for the species if it does not exist
-            if not os.path.exists(audio_path):
-                os.makedirs(audio_path)
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
 
             # If the file exists in the directory, we will skip it
-            if os.path.exists(audio_path + audio_file):
+            if os.path.exists(file_path):
                 print(track_id + ".mp3 is already present. Continuing...")
                 return
 
-            # Use the aiohttp client_session to retrieve the audio file asynchronously
+            # Use the aiohttp client to retrieve the audio file asynchronously
             async with client_session.get(url) as response:
-                print("Start request at " + str(time.time()))
                 if response.status == 200:
-                        f = await aiofiles.open((audio_path + audio_file), mode='wb')
-                        await f.write(await response.content.read())
-                        await f.close()
+                    f = await aiofiles.open((file_path), mode='wb')
+                    await f.write(await response.content.read())
+                    await f.close()
                 else:
                     print("Error occurred: " + str(response.status))
 
@@ -168,13 +170,13 @@ async def download(filt):
     # Retrieve the number of recordings to be downloaded
     recordings_num = url_list[0]
     print(str(recordings_num) + " recordings found, downloading...")
-    
+
     # Setup the aiohttp client with the desired semaphore limit
     http_client = chunked_http_client(5)
     async with aiohttp.ClientSession() as client_session:
 
-        # Collect the required tasks and await futures to ensure concurrent processing
-        tasks = [http_client(track_tuple, client_session) for track_tuple in  url_list[1]]
+        # Collect tasks and await futures to ensure concurrent processing
+        tasks = [http_client(track_tuple, client_session) for track_tuple in url_list[1]]
         for future in asyncio.as_completed(tasks):
             data = await future
 
@@ -194,7 +196,7 @@ def purge(num):
         fold_path = path + fold
         count = sum(1 for _ in listdir_nohidden(fold_path))
         if count < num:
-            print("Folder at " + fold_path + " has fewer than " + str(num) + " recordings. Deleting...")
+            print("Deleting " + fold_path + " since <" + str(num) + "tracks.")
             shutil.rmtree(fold_path)
 
 
@@ -262,7 +264,7 @@ def gen_meta(path='dataset/audio/'):
         for f in filenames:
             track_id = (f.split('.'))
             id_list.add(track_id[0])
-    
+
     count = len(id_list)
 
     write_data = dict()
@@ -274,7 +276,7 @@ def gen_meta(path='dataset/audio/'):
     for filename in listdir_nohidden('dataset/metadata/'):
         if filename != 'library.json':
             meta_files.append(filename)
-    
+
     # Check each metadata track for presence in library
     found_files = set()
     for f in meta_files:
@@ -284,27 +286,27 @@ def gen_meta(path='dataset/audio/'):
         while page < page_num + 1:
 
             # Open the json
-            with open('dataset/metadata/' + f + '/page'+ str(page)  + ".json", 'r') as jsonfile:
+            with open('dataset/metadata/' + f + '/page' + str(page) + ".json", 'r') as jsonfile:
                 data = jsonfile.read()
             data = json.loads(data)
             page_num = data['numPages']
-        
+
             # Parse through each track
             for i in range(len(data['recordings'])):
-                track = data['recordings'][i]['id'] 
+                track = data['recordings'][i]['id']
                 if track in id_list:
                     track_info = data['recordings'][i]
                     write_data['tracks'].append(track_info)
             page += 1
 
-    # Retrieves information from  API for tracks that cannot be found in the 
+    # Retrieves information from  API for tracks that cannot be found in the
     # currently saved metadata
     found_files = list()
     for i in range(len(write_data['tracks'])):
         found_files.append(write_data['tracks'][i]['id'])
-    
+
     not_found = list(set(id_list) - set(found_files))
-    
+
     for i in not_found:
         track_find = 'nr:' + i
         path = metadata([track_find])
@@ -323,14 +325,13 @@ def gen_meta(path='dataset/audio/'):
 def main():
     act = sys.argv[1]
     params = sys.argv[2:]
- 
+
     if act == "-m":
         metadata(params)
 
     elif act == "-dl":
         start = time.time()
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(download(params))
+        asyncio.run(download(params))
         end = time.time()
         print("Time elapsed: " + str((end - start)))
 
@@ -344,12 +345,12 @@ def main():
             gen_meta()
 
     elif act == '-d':
-        dec = input("Are you sure you want to proceed with deleting? (Y or N)\n")
+        dec = input("Proceed with deleting? (Y or N)\n")
         if dec == "Y":
             delete(params)
-            
+
     else:
-        print("The command entered was not found, please consult the README for instructions and available commands.")
+        print("Command not found, please consult the README.")
 
 
 # Handles command line execution
