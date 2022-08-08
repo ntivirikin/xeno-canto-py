@@ -13,7 +13,7 @@ setup(
     py_modules=['xenocanto'],
     entry_points={"console_scripts": ["xeno-canto = xenocanto:main"]},
     install_requires=[
-        'aiohttp',
-        'aiofiles',
+        'aiofiles>=0.8.0',
+        'aiohttp>=3.8.1',
     ],
 )

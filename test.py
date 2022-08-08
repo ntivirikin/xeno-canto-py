@@ -1,13 +1,11 @@
-from xenocanto import metadata, download, gen_meta, purge, delete
-from urllib import request
-import unittest
-import shutil
-import os
 import asyncio
+import os
+import shutil
+import unittest
+from urllib import request
+from xenocanto import metadata, download, gen_meta, purge, delete
 
-
-# TODO: 
-#   [ ] Mock objects and test calls
+# TODO:
 #   [ ] Test resuming a download after interrupt
 class TestCases(unittest.TestCase):
 

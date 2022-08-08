@@ -56,6 +56,19 @@ xeno-canto -p 10
 # (defaults to 'dataset/audio/')
 xeno-canto -g
 ```
+
+## Error 503
+If an Error 503 is given when attempting a recording download, try passing a value lower than 4 as the num_chunks value in download(filt, num_chunks). This can either be done by setting the default value in the function definition, or by passing a value into download() in the body of the main method. 
+
+For example,
+```python
+download("Northern Cardinal")
+
+download("Northern Cardinal", 4)
+```
+
+Alternatively, you can try experimenting with higher values for num_chunks to see some performance improvements.
+
 ## Contributing
 All pull requests are welcome! If any issues are found, please do not hesitate to bring them to my attention.
 ## Acknowledgements
