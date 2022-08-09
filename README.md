@@ -1,61 +1,111 @@
 # xeno-canto API Wrapper
-xeno-canto-py is an API wrapper designed to help users easily download xeno-canto.org recordings and associated information.
+xeno-canto-py is an API wrapper designed to help users download xeno-canto.org recordings and associated information in an efficient manner. Download requests are processed concurrently using the `asyncio`, `aiohttp` and `aiofiles` libraries to optimize retrieval time. The wrapper also offers delete and metadata generation functions for recording library management.
 
-Originally created to aid in data collection and filtering for the training of machine learning models.
+Created to aid in data collection and filtering for the training of machine learning models.
 ## Installation
-Navigate to your desired file location in a terminal and then clone the repository with the following command:
-```bash
-git clone https://github.com/ntivirikin/xeno-canto-py
-```
-The only file required for operation is the ```xenocanto.py``` file, so feel free to remove the others or move ```xenocanto.py``` to another working directory.
-
-You may also use the package manager [pip](https://pip.pypa.io/en/stable/) to install xeno-canto-py to include in your Python projects.
-
+xeno-canto-py is available on [PyPi](https://pypi.org/project/xeno-canto/) and can be downloaded with the package manager [pip](https://pip.pypa.io/en/stable/) to install xeno-canto-py.
 ```bash
 pip install xeno-canto
 ```
-Then import the module:
-```python
-import xenocanto
-```
-Or use it straight from the command line:
+The package can then be used straight from the command-line:
 ```bash
 xeno-canto -dl Bearded Bellbird
 ```
-## Usage
-Commands through the terminal are given in the following format:
+Or imported into an existing Python project:
+```python
+import xenocanto
 ```
--m 	[filters]	Metadata generation
-
--dl 	[filters] 	Download recordings
-
--d 	[filters]	Delete recordings
-
--p 	[num] 		Purge folders containing num or fewer recordings
-
--g 	[path] 		Generate metadata for provided library path (defaults to 'dataset/audio/')
-```
-```filters``` are given in tag:value form in accordance with the API search guidelines. For help in building search terms, consult the [xeno-canto API guide](https://www.xeno-canto.org/article/153). The only exception is when providing English bird names as an argument to the ```-d``` command, which must be preceded with ```en:``` and have all spaces be replaced with underscores.
-
-Examples of command usage are given below:
+For users who want more control over the wrapper, navigate to your desired file location in a terminal window and then clone the repository with the following command:
 ```bash
-# Retrieving metadata
-xeno-canto -m Bearded Bellbird q:A
-
-# Downloading recordings
-xeno-canto -dl Bearded Bellbird cnt:Brazil
-
-# Delete recordings with ANY of specified criteria from
-# library
-xeno-canto -d q:D cnt:Brazil
-
-# Purge folders with less than 10 recordings
-xeno-canto -p 10
-
-# Generate metadata for all recordings in the path
-# (defaults to 'dataset/audio/')
-xeno-canto -g
+git clone https://github.com/ntivirikin/xeno-canto-py
 ```
+The only file required for operation is `xenocanto.py`, so feel free to remove the others or move `xenocanto.py` to another working directory.
+
+**WARNING:** Please exercise caution using `test.py` as executing the tests via `unittest` or other test harness will delete any `dataset` folder in the working directory following completion of the tests.
+## Usage
+The xeno-canto-py wrapper supports the retrieval of metadata and audio from the xeno-canto database, as well as library management functions such as deletion of recordings matching input tags, removal of folders with an insufficient amount of audio recordings and generation of a single JSON metadata file for a given path containing xeno-canto audio recordings. Examples of command usage are given below.
+
+---
+**Metadata Download**
+`xeno-canto -m [parameters]`
+
+Downloads metadata as a series of JSON files and returns the path to the metadata folder.
+
+_Example: Metadata retrieval for Bearded Bellbird recordings of quality A_
+
+`xeno-canto -m Bearded Bellbird q:A`
+
+---
+**Audio Recording Download**
+`xeno-canto -dl [parameters]`
+
+Retrieves the metadata for the request and uses it to download audio recordings as MP3s from the database.
+
+_Example: Download Bearded Bellbird recordings from the country of Brazil_
+
+`xeno-canto -dl Bearded Bellbird cnt:Brazil`
+
+---
+**Delete Recordings**
+`xeno-canto -del [parameters]`
+
+Delete recordings with **ANY** of the parameters given as input.
+
+_Example: Delete **ALL** quality D recordings and **ALL** recordings from Brazil_
+
+`xeno-canto -del q:D cnt:Brazil`
+
+---
+**Purge Folders**
+
+Removes any folders within the `dataset/audio/` directory that have less recordings than the input value `num`.
+
+`xeno-canto -p [num]`
+
+_Example: Remove recording folders with less than 10 recordings (not inclusive)_
+
+`xeno-canto -p 10`
+
+---
+**Generate Metadata**
+
+Generates metadata for the xeno-canto database recordings at the input path, defaulting to `dataset/audio/` within the working directory if none is given.
+
+`xeno-canto -g [path]`
+
+_Example: Generate metadata for the recordings located in `bird_rec/audio/` within the working directory_
+
+`xeno-canto -g bird_rec/audio/`
+
+---
+`parameters` are given in tag:value form in accordance with the API search guidelines. For help in building search terms, consult the [xeno-canto API guide](https://xeno-canto.org/explore/api) and this [article](https://xeno-canto.org/article/153). The only exception is when providing English bird names as an argument to the delete function, which must be preceded with `en:` and have all spaces be replaced with underscores.
+### Directory Structure
+Files are saved in the working directory under the folder `dataset/`. Metadata and audio recordings are separated into `metadata/` and `audio/` folders by request information and bird species respectively. For example:
+```
+dataset/
+    - audio/
+        - Indigo Bunting/
+            - 14325.mp3
+        - Northern Cardinal/
+            - 8273.mp3
+    - metadata/
+        - library.json
+        - IndigoBuntingcnt_Canada/
+            - page1.json
+        - NorthernCardinalq_A/
+            - page1.json
+```
+Metadata is retrieved as a JSON file and contains information on each of the audio recordings matching the request parameters provided as input. The metadata also contains the download links used to retrieve the audio recordings. The `library.json` file is generated by running the metadata generation command `-g`.
+### Error 503
+If an Error 503 is given when attempting a recording download, try passing a value lower than 4 as the num\_chunks value in download(filt, num\_chunks). This can either be done by changing the default value in the function definition for `download(filt, num_chunks)`, or by passing a value into `download(params)` in the body of `main()` as shown below.
+```python
+# Running with default 4 locks on semaphore
+asyncio.run(download(params))
+
+# Running with 3 locks rather than default
+asyncio.run(download(params, 3))
+```
+Alternatively, you can try experimenting with higher values for num_chunks to see some performance improvements.
 ## Contributing
 All pull requests are welcome! If any issues are found, please do not hesitate to bring them to my attention.
 ## Acknowledgements
