@@ -13,8 +13,8 @@ import aiohttp
 
 
 # TODO:
-#   [X] Log messages to console
-#   [ ] Add sono image download capabilities
+#   [X] Add sono image download capabilities
+#   [X] Add metadata generation for sono images following audio generation
 #   [ ] Add ability to process multiple species in one command
 #   [ ] Create function to verify all recordings downloaded correctly
 #   [ ] Purge recordings that did not complete download
@@ -197,6 +197,128 @@ async def download(filt, num_chunks=4):
             data = await future
     print("Download complete.")
 
+def list_sonourls(path, sono_type='full'):
+    url_list = []
+    page = 1
+
+    # Initial opening of JSON to retrieve amount of pages and recordings
+    with open(path + '/page' + str(page) + '.json', 'r') as jsonfile:
+        data = jsonfile.read()
+        jsonfile.close()
+    data = json.loads(data)
+    page_num = data['numPages']
+    recordings_num = int(data['numRecordings'])
+
+    # Clear may not be required if setting to None, included for redundancy
+    data.clear()
+    data = None
+
+    # Set the first element to the number of recordings
+    url_list.append(recordings_num)
+
+    # Second element will be a list of tuples with (name, track_id, sono url)
+    url_list.append(list())
+
+    # Read each metadata file and extract information into list as a tuple
+    while page < page_num + 1:
+        with open(path + '/page' + str(page) + '.json', 'r') as jsonfile:
+            data = jsonfile.read()
+            jsonfile.close()
+        data = json.loads(data)
+
+        # Extract the number of recordings in the opened metadata file
+        rec_length = len(data['recordings'])
+
+        # Parse through the opened data and add it to the URL list
+        for i in range(0, rec_length):
+            name = (data['recordings'][i]['en']).replace(' ', '')
+            track_id = data['recordings'][i]['id']
+            sono_url = data['recordings'][i]['sono'][sono_type]
+            track_info = (name, track_id, sono_url)
+            url_list[1].append(track_info)
+        page += 1
+    return url_list
+    #
+
+
+# Client that processes the list of track information concurrently
+def sono_http_client(num_chunks):
+
+    # Semaphore used to limit the number of requests with num_chunks
+    semaphore = asyncio.Semaphore(num_chunks)
+
+    # Processes a tuple from the url_list using the aiohttp client_session
+    async def http_get(sono_tuple, client_session):
+
+        # Work with semaphore located outside the function
+        nonlocal semaphore
+        async with semaphore:
+
+            # Pull relevant info from tuple
+            name = str(sono_tuple[0])
+            track_id = str(sono_tuple[1])
+            sono_url = sono_tuple[2]
+
+            # Set up the paths required for saving the audio file
+            folder_path = 'dataset/sono/' + name + '/'
+            file_path = folder_path + track_id + '.png'
+
+            # Create an audio folder for the species if it does not exist
+            if not os.path.exists(folder_path):
+                print("Creating sonograph folder at " + str(folder_path))
+                os.makedirs(folder_path)
+
+            # If the file exists in the directory, we will skip it
+            if os.path.exists(file_path):
+                print(track_id + ".png is already present. Skipping...")
+                return
+            sono_url = 'https:' + sono_url
+            # Use the aiohttp client to retrieve the audio file asynchronously
+            async with client_session.get(sono_url) as response:
+                if response.status == 200:
+                    f = await aiofiles.open((file_path), mode='wb')
+                    await f.write(await response.content.read())
+                    await f.close()
+                elif response.status == 503:
+                    print("Error 503 occurred when downloading " + track_id +
+                          ".png. Please try using a lower value for "
+                          "num_chunks. Consult the README for more "
+                          "information.")
+                else:
+                    print("Error " + str(response.status) + " occurred "
+                          "when downloading " + track_id + ".png.")
+
+    return http_get
+
+
+# Retrieves the metadata and sonograph images for a given set of input param
+async def download_sono(filt, num_chunks=4):
+
+    # Retrieve metadata and generate list of sono information
+    meta_path = metadata(filt)
+    sono_list = list_sonourls(meta_path)
+
+    # Retrieve the number of recordings to be downloaded
+    recordings_num = sono_list[0]
+
+    # Exit the program if no recordings are found
+    if (recordings_num == 0):
+        print("No images found for the provided request.")
+        quit()
+
+    print(str(recordings_num) + " images found, downloading...")
+
+    # Setup the aiohttp client with the desired semaphore limit
+    http_client = sono_http_client(num_chunks)
+    async with aiohttp.ClientSession() as client_session:
+
+        # Collect tasks and await futures to ensure concurrent processing
+        tasks = [http_client(sono_tuple, client_session) for sono_tuple in
+                 sono_list[1]]
+        for future in asyncio.as_completed(tasks):
+            data = await future
+    print("Download complete.")
+
 
 # Retrieve all files while ignoring those that are hidden
 def listdir_nohidden(path):
@@ -289,11 +411,13 @@ def gen_meta(path='dataset/audio/'):
     if not os.path.exists(path):
         print("Path " + str(path) + " does not exist.")
         return
-    print("Generating metadata file for current recording library...")
+
+    file_name = path.split('/')[1]
+    print("Generating metadata file for current library...")
 
     # Removing old library file if exists
-    if os.path.exists('dataset/metadata/library.json'):
-        os.remove('dataset/metadata/library.json')
+    if os.path.exists('dataset/metadata/library_' + str(file_name) + '.json'):
+        os.remove('dataset/metadata/library_' + str(file_name) + '.json')
 
     # Create a list of track ID's contained in the current library
     id_list = set()
@@ -305,7 +429,7 @@ def gen_meta(path='dataset/audio/'):
             id_list.add(track_id[0])
 
     count = len(id_list)
-    print(str(count) + " recordings have been found. Collecting metadata...")
+    print(str(count) + " files have been found. Collecting metadata...")
 
     write_data = dict()
     write_data['recordingNumber'] = str(count)
@@ -315,12 +439,16 @@ def gen_meta(path='dataset/audio/'):
     meta_files = list()
     if os.path.exists('dataset/metadata/'):
         for filename in listdir_nohidden('dataset/metadata/'):
-            if filename != 'library.json':
+            if filename != 'library_' + str(file_name) + '.json':
                 meta_files.append(filename)
 
     # Check each metadata track for presence in library
     found_files = set()
     for f in meta_files:
+        ff = f.split('.')
+        if len(ff) >= 2:
+            if ff[1] == 'json':
+                continue
         page_num = 1
         page = 1
 
@@ -364,8 +492,10 @@ def gen_meta(path='dataset/audio/'):
     with open('data.txt', 'w') as outfile:
         json.dump(write_data, outfile)
 
-    os.rename('data.txt', 'dataset/metadata/library.json')
-    print("Metadata successfully generated at dataset/metadata/library.json")
+    os.rename('data.txt', 'dataset/metadata/library_' +
+              str(file_name) + '.json')
+    print("Metadata successfully generated at dataset/metadata/library_" +
+          str(file_name) + ".json")
 
 
 # Accepts command line input to determine function to execute
@@ -402,12 +532,19 @@ def main():
             gen_meta(params[0])
         else:
             gen_meta()
+            gen_meta('dataset/sono/')
 
     # Delete recordings matching ANY input parameter
     elif act == '-del':
         dec = input("Proceed with deleting? (Y or N)\n")
         if dec == "Y":
             delete(params)
+
+    elif act == '-sono':
+        start = time.time()
+        asyncio.run(download_sono(params))
+        end = time.time()
+        print("Duration: " + str(int(end - start)) + "s")
 
     else:
         print("Command not found, please consult the README.")
