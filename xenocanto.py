@@ -370,6 +370,14 @@ def gen_meta(path='dataset/audio/'):
 
 # Accepts command line input to determine function to execute
 def main():
+    if len(sys.argv) == 1:
+        print("No command given. Please consult the README for help.")
+        return
+
+    if len(sys.argv) == 2:
+        print("Commands must be given in a '-command parameter' format. "
+              "Please consult the README for help.")
+
     act = sys.argv[1]
     params = sys.argv[2:]
 
@@ -396,7 +404,7 @@ def main():
             gen_meta()
 
     # Delete recordings matching ANY input parameter
-    elif act == '-d':
+    elif act == '-del':
         dec = input("Proceed with deleting? (Y or N)\n")
         if dec == "Y":
             delete(params)

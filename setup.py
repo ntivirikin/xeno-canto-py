@@ -3,6 +3,7 @@ from setuptools import setup
 setup(
     name='xeno-canto',
     version='3.0',
+    python_requires='>3.4.0',
     description='xeno-canto.org API Wrapper',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
