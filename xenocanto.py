@@ -13,9 +13,8 @@ import aiohttp
 
 
 # TODO:
-#   [X] Add sono image download capabilities
-#   [X] Add metadata generation for sono images following audio generation
 #   [ ] Add ability to process multiple species in one command
+#   [X] Modify delete function to allow for sonogram deletion
 #   [ ] Create function to verify all recordings downloaded correctly
 #   [ ] Purge recordings that did not complete download
 #   [ ] Add text file processing for batch requests
@@ -25,6 +24,13 @@ import aiohttp
 #   [ ] Modify delete method to remove recordings containing all input tags
 #       rather than any one of the tags
 #   [ ] Allow the delete method to accept species names with spaces
+
+
+# Retrieve all files while ignoring those that are hidden
+def listdir_nohidden(path):
+    for f in os.listdir(path):
+        if not f.startswith('.'):
+            yield f
 
 
 # Retrieves metadata for requested recordings in the form of a JSON file
@@ -75,8 +81,8 @@ def metadata(filt):
     return path
 
 
-# Uses JSON metadata files to generate a list of recording URLs
-def list_urls(path):
+# Generates list of recording URLs using JSON metadata
+def list_urls(path, sono, sono_type='full'):
     url_list = []
     page = 1
 
@@ -112,15 +118,20 @@ def list_urls(path):
         for i in range(0, rec_length):
             name = (data['recordings'][i]['en']).replace(' ', '')
             track_id = data['recordings'][i]['id']
-            track_url = data['recordings'][i]['file']
-            track_info = (name, track_id, track_url)
+
+            # Determine if the sonogram or audio recording URL is required
+            if sono:
+                dl_url = data['recordings'][i]['sono'][sono_type]
+            else:
+                dl_url = data['recordings'][i]['file']
+            track_info = (name, track_id, dl_url)
             url_list[1].append(track_info)
         page += 1
     return url_list
 
 
 # Client that processes the list of track information concurrently
-def chunked_http_client(num_chunks):
+def chunked_http_client(num_chunks=4):
 
     # Semaphore used to limit the number of requests with num_chunks
     semaphore = asyncio.Semaphore(num_chunks)
@@ -169,80 +180,8 @@ def chunked_http_client(num_chunks):
     return http_get
 
 
-# Retrieves metadata and recordings for a given set of input param
-async def download(filt, num_chunks=4):
-
-    # Retrieve metadata and generate list of track information
-    meta_path = metadata(filt)
-    url_list = list_urls(meta_path)
-
-    # Retrieve the number of recordings to be downloaded
-    recordings_num = url_list[0]
-
-    # Exit the program if no recordings are found
-    if (recordings_num == 0):
-        print("No recordings found for the provided request.")
-        quit()
-
-    print(str(recordings_num) + " recordings found, downloading...")
-
-    # Setup the aiohttp client with the desired semaphore limit
-    http_client = chunked_http_client(num_chunks)
-    async with aiohttp.ClientSession() as client_session:
-
-        # Collect tasks and await futures to ensure concurrent processing
-        tasks = [http_client(track_tuple, client_session) for track_tuple in
-                 url_list[1]]
-        for future in asyncio.as_completed(tasks):
-            data = await future
-    print("Download complete.")
-
-def list_sonourls(path, sono_type='full'):
-    url_list = []
-    page = 1
-
-    # Initial opening of JSON to retrieve amount of pages and recordings
-    with open(path + '/page' + str(page) + '.json', 'r') as jsonfile:
-        data = jsonfile.read()
-        jsonfile.close()
-    data = json.loads(data)
-    page_num = data['numPages']
-    recordings_num = int(data['numRecordings'])
-
-    # Clear may not be required if setting to None, included for redundancy
-    data.clear()
-    data = None
-
-    # Set the first element to the number of recordings
-    url_list.append(recordings_num)
-
-    # Second element will be a list of tuples with (name, track_id, sono url)
-    url_list.append(list())
-
-    # Read each metadata file and extract information into list as a tuple
-    while page < page_num + 1:
-        with open(path + '/page' + str(page) + '.json', 'r') as jsonfile:
-            data = jsonfile.read()
-            jsonfile.close()
-        data = json.loads(data)
-
-        # Extract the number of recordings in the opened metadata file
-        rec_length = len(data['recordings'])
-
-        # Parse through the opened data and add it to the URL list
-        for i in range(0, rec_length):
-            name = (data['recordings'][i]['en']).replace(' ', '')
-            track_id = data['recordings'][i]['id']
-            sono_url = data['recordings'][i]['sono'][sono_type]
-            track_info = (name, track_id, sono_url)
-            url_list[1].append(track_info)
-        page += 1
-    return url_list
-    #
-
-
 # Client that processes the list of track information concurrently
-def sono_http_client(num_chunks):
+def sono_http_client(num_chunks=4):
 
     # Semaphore used to limit the number of requests with num_chunks
     semaphore = asyncio.Semaphore(num_chunks)
@@ -259,11 +198,11 @@ def sono_http_client(num_chunks):
             track_id = str(sono_tuple[1])
             sono_url = sono_tuple[2]
 
-            # Set up the paths required for saving the audio file
+            # Set up the paths required for saving the image file
             folder_path = 'dataset/sono/' + name + '/'
             file_path = folder_path + track_id + '.png'
 
-            # Create an audio folder for the species if it does not exist
+            # Create a sonogram folder for the species if it does not exist
             if not os.path.exists(folder_path):
                 print("Creating sonograph folder at " + str(folder_path))
                 os.makedirs(folder_path)
@@ -273,7 +212,8 @@ def sono_http_client(num_chunks):
                 print(track_id + ".png is already present. Skipping...")
                 return
             sono_url = 'https:' + sono_url
-            # Use the aiohttp client to retrieve the audio file asynchronously
+
+            # Use the aiohttp client to retrieve the images asynchronously
             async with client_session.get(sono_url) as response:
                 if response.status == 200:
                     f = await aiofiles.open((file_path), mode='wb')
@@ -291,68 +231,69 @@ def sono_http_client(num_chunks):
     return http_get
 
 
-# Retrieves the metadata and sonograph images for a given set of input param
-async def download_sono(filt, num_chunks=4):
+# Retrieves metadata and recordings for a given set of input parameters
+async def download(filt, sono=False):
 
-    # Retrieve metadata and generate list of sono information
+    # Retrieve metadata and generate list of track information
     meta_path = metadata(filt)
-    sono_list = list_sonourls(meta_path)
+    url_list = list_urls(meta_path, sono)
 
     # Retrieve the number of recordings to be downloaded
-    recordings_num = sono_list[0]
+    recordings_num = url_list[0]
 
     # Exit the program if no recordings are found
     if (recordings_num == 0):
-        print("No images found for the provided request.")
+        print("No recordings found for the provided request.")
         quit()
-
-    print(str(recordings_num) + " images found, downloading...")
+    print(str(recordings_num) + " recordings found, downloading...")
 
     # Setup the aiohttp client with the desired semaphore limit
-    http_client = sono_http_client(num_chunks)
+    if sono:
+        http_client = sono_http_client()
+    else:
+        http_client = chunked_http_client()
     async with aiohttp.ClientSession() as client_session:
 
         # Collect tasks and await futures to ensure concurrent processing
-        tasks = [http_client(sono_tuple, client_session) for sono_tuple in
-                 sono_list[1]]
+        tasks = [http_client(track_tuple, client_session) for track_tuple in
+                 url_list[1]]
         for future in asyncio.as_completed(tasks):
             data = await future
     print("Download complete.")
 
 
-# Retrieve all files while ignoring those that are hidden
-def listdir_nohidden(path):
-    for f in os.listdir(path):
-        if not f.startswith('.'):
-            yield f
-
-
 # Removes audio folders containing num or less than num files
-def purge(num):
-    print("Removing all audio folders with fewer than " + str(num) +
-          " recordings.")
-    path = 'dataset/audio/'
+def purge(num, sono=False):
+    print("Removing all folders with fewer than " + str(num) +
+          " files.")
+
+    # Determine if audio or sonogram folders are being purged
+    if sono:
+        path = 'dataset/sono/'
+    else:
+        path = 'dataset/audio/'
     dirs = listdir_nohidden(path)
     remove_count = 0
 
-    # Count the number of tracks in each folder
+    # Count the number of files in each folder
     for fold in dirs:
         fold_path = path + fold
         count = sum(1 for _ in listdir_nohidden(fold_path))
 
         # Remove the folder if the track amount is less than input
         if count < num:
-            print("Deleting " + fold_path + " since <" + str(num) + " tracks.")
+            print("Deleting " + fold_path + " since <" + str(num) + " files.")
             shutil.rmtree(fold_path)
             remove_count = remove_count + 1
     print(str(remove_count) + " folders removed.")
 
 
 # Deletes audio tracks based on provided parameters
-def delete(filt):
+def delete(filt, sono=False):
 
     # Generating list of current tracks with metadata
     gen_meta()
+    gen_meta('dataset/sono/')
 
     # Separating desired tags from values for parsing
     tags = list()
@@ -365,9 +306,12 @@ def delete(filt):
         if tag == 'en':
             val = val.replace('_', ' ')
         vals.append(val)
-
-    with open('dataset/metadata/library.json', 'r') as jsonfile:
-        data = jsonfile.read()
+    if sono:
+        with open('dataset/metadata/library_sono.json', 'r') as jsonfile:
+            data = jsonfile.read()
+    else:
+        with open('dataset/metadata/library_audio.json', 'r') as jsonfile:
+            data = jsonfile.read()
     data = json.loads(data)
 
     # Creating a set of track id's to delete
@@ -377,17 +321,13 @@ def delete(filt):
             if data['tracks'][i][str(tags[j])] == str(vals[j]):
                 track_del.add(int(data['tracks'][i]['id']))
 
-            # Proposed change for deletion of tracks matching all inputs
-            # rather than any
-            #
-            # if data['tracks'][i][str(tags[j])] != str(vals[j]):
-                # exit this for loop
-            # track_del.add(int(data['tracks'][i]['id']))
-
     print(str(len(track_del)) + " tracks have been identified to be deleted.")
 
-    # Checking audio folders for tracks to delete
-    path = 'dataset/audio/'
+    # Checking folders for tracks to delete
+    if sono:
+        path = 'dataset/sono/'
+    else:
+        path = 'dataset/audio/'
     dirs = listdir_nohidden(path)
     removed = 0
     for fold in dirs:
@@ -398,10 +338,13 @@ def delete(filt):
                 os.remove(fold_path + '/' + str(tr))
                 removed = removed + 1
 
-    print(str(removed) + " tracks deleted!")
+    print(str(removed) + " files deleted!")
 
     # Removing any empty folders
-    purge(1)
+    if sono:
+        purge(1, True)
+    else:
+        purge(1)
 
 
 # Generate a metadata file for given library path
@@ -537,14 +480,21 @@ def main():
     # Delete recordings matching ANY input parameter
     elif act == '-del':
         dec = input("Proceed with deleting? (Y or N)\n")
-        if dec == "Y":
+        if dec == ("Y" or "y"):
             delete(params)
 
+    # Download sonograms of recordings
     elif act == '-sono':
         start = time.time()
-        asyncio.run(download_sono(params))
+        asyncio.run(download(params, True))
         end = time.time()
         print("Duration: " + str(int(end - start)) + "s")
+
+    # Delete images matching ANY input parameter
+    elif act == '-delsono':
+        dec = input("Proceed with deleting? (Y or N)\n")
+        if dec == ("Y" or "y"):
+            delete(params, True)
 
     else:
         print("Command not found, please consult the README.")
