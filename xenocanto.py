@@ -150,7 +150,7 @@ def chunked_http_client(num_chunks):
 
             # If the file exists in the directory, we will skip it
             if os.path.exists(file_path):
-                print(track_id + "." + track_format + " is already present. Skipping...")
+                print(track_id + track_format + " is already present. Skipping...")
                 return
 
             # Use the aiohttp client to retrieve the audio file asynchronously
@@ -160,13 +160,13 @@ def chunked_http_client(num_chunks):
                     await f.write(await response.content.read())
                     await f.close()
                 elif response.status == 503:
-                    print("Error 503 occurred when downloading " + track_id +
-                          "." + track_format + ". Please try using a lower value for "
+                    print("Error 503 occurred when downloading " + track_id
+                          + track_format + ". Please try using a lower value for "
                           "num_chunks. Consult the README for more "
                           "information.")
                 else:
                     print("Error " + str(response.status) + " occurred "
-                          "when downloading " + track_id + "." + track_format + ".")
+                          "when downloading " + track_id + track_format + ".")
 
     return http_get
 
