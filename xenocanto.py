@@ -13,9 +13,8 @@ import aiohttp
 
 
 # TODO:
-#   [X] Log messages to console
-#   [ ] Add sono image download capabilities
 #   [ ] Add ability to process multiple species in one command
+#   [X] Modify delete function to allow for sonogram deletion
 #   [ ] Create function to verify all recordings downloaded correctly
 #   [ ] Purge recordings that did not complete download
 #   [ ] Add text file processing for batch requests
@@ -25,6 +24,13 @@ import aiohttp
 #   [ ] Modify delete method to remove recordings containing all input tags
 #       rather than any one of the tags
 #   [ ] Allow the delete method to accept species names with spaces
+
+
+# Retrieve all files while ignoring those that are hidden
+def listdir_nohidden(path):
+    for f in os.listdir(path):
+        if not f.startswith('.'):
+            yield f
 
 
 # Retrieves metadata for requested recordings in the form of a JSON file
@@ -75,8 +81,8 @@ def metadata(filt):
     return path
 
 
-# Uses JSON metadata files to generate a list of recording URLs
-def list_urls(path):
+# Generates list of recording URLs using JSON metadata
+def list_urls(path, sono, sono_type='full'):
     url_list = []
     page = 1
 
@@ -112,16 +118,18 @@ def list_urls(path):
         for i in range(0, rec_length):
             name = (data['recordings'][i]['en']).replace(' ', '')
             track_id = data['recordings'][i]['id']
+
             track_url = data['recordings'][i]['file']
             track_format = os.path.splitext(data['recordings'][i]['file-name'])[-1]
             track_info = (name, track_id, track_url, track_format)
+
             url_list[1].append(track_info)
         page += 1
     return url_list
 
 
 # Client that processes the list of track information concurrently
-def chunked_http_client(num_chunks):
+def chunked_http_client(num_chunks=4):
 
     # Semaphore used to limit the number of requests with num_chunks
     semaphore = asyncio.Semaphore(num_chunks)
@@ -171,12 +179,63 @@ def chunked_http_client(num_chunks):
     return http_get
 
 
-# Retrieves metadata and recordings for a given set of input param
-async def download(filt, num_chunks=4):
+# Client that processes the list of track information concurrently
+def sono_http_client(num_chunks=4):
+
+    # Semaphore used to limit the number of requests with num_chunks
+    semaphore = asyncio.Semaphore(num_chunks)
+
+    # Processes a tuple from the url_list using the aiohttp client_session
+    async def http_get(sono_tuple, client_session):
+
+        # Work with semaphore located outside the function
+        nonlocal semaphore
+        async with semaphore:
+
+            # Pull relevant info from tuple
+            name = str(sono_tuple[0])
+            track_id = str(sono_tuple[1])
+            sono_url = sono_tuple[2]
+
+            # Set up the paths required for saving the image file
+            folder_path = 'dataset/sono/' + name + '/'
+            file_path = folder_path + track_id + '.png'
+
+            # Create a sonogram folder for the species if it does not exist
+            if not os.path.exists(folder_path):
+                print("Creating sonograph folder at " + str(folder_path))
+                os.makedirs(folder_path)
+
+            # If the file exists in the directory, we will skip it
+            if os.path.exists(file_path):
+                print(track_id + ".png is already present. Skipping...")
+                return
+            sono_url = 'https:' + sono_url
+
+            # Use the aiohttp client to retrieve the images asynchronously
+            async with client_session.get(sono_url) as response:
+                if response.status == 200:
+                    f = await aiofiles.open((file_path), mode='wb')
+                    await f.write(await response.content.read())
+                    await f.close()
+                elif response.status == 503:
+                    print("Error 503 occurred when downloading " + track_id +
+                          ".png. Please try using a lower value for "
+                          "num_chunks. Consult the README for more "
+                          "information.")
+                else:
+                    print("Error " + str(response.status) + " occurred "
+                          "when downloading " + track_id + ".png.")
+
+    return http_get
+
+
+# Retrieves metadata and recordings for a given set of input parameters
+async def download(filt, sono=False):
 
     # Retrieve metadata and generate list of track information
     meta_path = metadata(filt)
-    url_list = list_urls(meta_path)
+    url_list = list_urls(meta_path, sono)
 
     # Retrieve the number of recordings to be downloaded
     recordings_num = url_list[0]
@@ -185,11 +244,13 @@ async def download(filt, num_chunks=4):
     if (recordings_num == 0):
         print("No recordings found for the provided request.")
         quit()
-
     print(str(recordings_num) + " recordings found, downloading...")
 
     # Setup the aiohttp client with the desired semaphore limit
-    http_client = chunked_http_client(num_chunks)
+    if sono:
+        http_client = sono_http_client()
+    else:
+        http_client = chunked_http_client()
     async with aiohttp.ClientSession() as client_session:
 
         # Collect tasks and await futures to ensure concurrent processing
@@ -200,39 +261,38 @@ async def download(filt, num_chunks=4):
     print("Download complete.")
 
 
-# Retrieve all files while ignoring those that are hidden
-def listdir_nohidden(path):
-    for f in os.listdir(path):
-        if not f.startswith('.'):
-            yield f
-
-
 # Removes audio folders containing num or less than num files
-def purge(num):
-    print("Removing all audio folders with fewer than " + str(num) +
-          " recordings.")
-    path = 'dataset/audio/'
+def purge(num, sono=False):
+    print("Removing all folders with fewer than " + str(num) +
+          " files.")
+
+    # Determine if audio or sonogram folders are being purged
+    if sono:
+        path = 'dataset/sono/'
+    else:
+        path = 'dataset/audio/'
     dirs = listdir_nohidden(path)
     remove_count = 0
 
-    # Count the number of tracks in each folder
+    # Count the number of files in each folder
     for fold in dirs:
         fold_path = path + fold
         count = sum(1 for _ in listdir_nohidden(fold_path))
 
         # Remove the folder if the track amount is less than input
         if count < num:
-            print("Deleting " + fold_path + " since <" + str(num) + " tracks.")
+            print("Deleting " + fold_path + " since <" + str(num) + " files.")
             shutil.rmtree(fold_path)
             remove_count = remove_count + 1
     print(str(remove_count) + " folders removed.")
 
 
 # Deletes audio tracks based on provided parameters
-def delete(filt):
+def delete(filt, sono=False):
 
     # Generating list of current tracks with metadata
     gen_meta()
+    gen_meta('dataset/sono/')
 
     # Separating desired tags from values for parsing
     tags = list()
@@ -245,9 +305,12 @@ def delete(filt):
         if tag == 'en':
             val = val.replace('_', ' ')
         vals.append(val)
-
-    with open('dataset/metadata/library.json', 'r') as jsonfile:
-        data = jsonfile.read()
+    if sono:
+        with open('dataset/metadata/library_sono.json', 'r') as jsonfile:
+            data = jsonfile.read()
+    else:
+        with open('dataset/metadata/library_audio.json', 'r') as jsonfile:
+            data = jsonfile.read()
     data = json.loads(data)
 
     # Creating a set of track id's to delete
@@ -257,17 +320,13 @@ def delete(filt):
             if data['tracks'][i][str(tags[j])] == str(vals[j]):
                 track_del.add(int(data['tracks'][i]['id']))
 
-            # Proposed change for deletion of tracks matching all inputs
-            # rather than any
-            #
-            # if data['tracks'][i][str(tags[j])] != str(vals[j]):
-                # exit this for loop
-            # track_del.add(int(data['tracks'][i]['id']))
-
     print(str(len(track_del)) + " tracks have been identified to be deleted.")
 
-    # Checking audio folders for tracks to delete
-    path = 'dataset/audio/'
+    # Checking folders for tracks to delete
+    if sono:
+        path = 'dataset/sono/'
+    else:
+        path = 'dataset/audio/'
     dirs = listdir_nohidden(path)
     removed = 0
     for fold in dirs:
@@ -278,10 +337,13 @@ def delete(filt):
                 os.remove(fold_path + '/' + str(tr))
                 removed = removed + 1
 
-    print(str(removed) + " tracks deleted!")
+    print(str(removed) + " files deleted!")
 
     # Removing any empty folders
-    purge(1)
+    if sono:
+        purge(1, True)
+    else:
+        purge(1)
 
 
 # Generate a metadata file for given library path
@@ -291,11 +353,13 @@ def gen_meta(path='dataset/audio/'):
     if not os.path.exists(path):
         print("Path " + str(path) + " does not exist.")
         return
-    print("Generating metadata file for current recording library...")
+
+    file_name = path.split('/')[1]
+    print("Generating metadata file for current library...")
 
     # Removing old library file if exists
-    if os.path.exists('dataset/metadata/library.json'):
-        os.remove('dataset/metadata/library.json')
+    if os.path.exists('dataset/metadata/library_' + str(file_name) + '.json'):
+        os.remove('dataset/metadata/library_' + str(file_name) + '.json')
 
     # Create a list of track ID's contained in the current library
     id_list = set()
@@ -307,7 +371,7 @@ def gen_meta(path='dataset/audio/'):
             id_list.add(track_id[0])
 
     count = len(id_list)
-    print(str(count) + " recordings have been found. Collecting metadata...")
+    print(str(count) + " files have been found. Collecting metadata...")
 
     write_data = dict()
     write_data['recordingNumber'] = str(count)
@@ -317,12 +381,16 @@ def gen_meta(path='dataset/audio/'):
     meta_files = list()
     if os.path.exists('dataset/metadata/'):
         for filename in listdir_nohidden('dataset/metadata/'):
-            if filename != 'library.json':
+            if filename != 'library_' + str(file_name) + '.json':
                 meta_files.append(filename)
 
     # Check each metadata track for presence in library
     found_files = set()
     for f in meta_files:
+        ff = f.split('.')
+        if len(ff) >= 2:
+            if ff[1] == 'json':
+                continue
         page_num = 1
         page = 1
 
@@ -366,8 +434,10 @@ def gen_meta(path='dataset/audio/'):
     with open('data.txt', 'w') as outfile:
         json.dump(write_data, outfile)
 
-    os.rename('data.txt', 'dataset/metadata/library.json')
-    print("Metadata successfully generated at dataset/metadata/library.json")
+    os.rename('data.txt', 'dataset/metadata/library_' +
+              str(file_name) + '.json')
+    print("Metadata successfully generated at dataset/metadata/library_" +
+          str(file_name) + ".json")
 
 
 # Accepts command line input to determine function to execute
@@ -404,12 +474,26 @@ def main():
             gen_meta(params[0])
         else:
             gen_meta()
+            gen_meta('dataset/sono/')
 
     # Delete recordings matching ANY input parameter
     elif act == '-del':
         dec = input("Proceed with deleting? (Y or N)\n")
-        if dec == "Y":
+        if dec == ("Y" or "y"):
             delete(params)
+
+    # Download sonograms of recordings
+    elif act == '-sono':
+        start = time.time()
+        asyncio.run(download(params, True))
+        end = time.time()
+        print("Duration: " + str(int(end - start)) + "s")
+
+    # Delete images matching ANY input parameter
+    elif act == '-delsono':
+        dec = input("Proceed with deleting? (Y or N)\n")
+        if dec == ("Y" or "y"):
+            delete(params, True)
 
     else:
         print("Command not found, please consult the README.")

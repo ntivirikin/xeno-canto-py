@@ -28,10 +28,15 @@ v2.0.4 	Jul 18, 2022 		-- Added method for generating links from metadata in pre
 				-- Fixed issue where 1st page of recordings was continuosly redownloaded if more than one page was present.
 				-- Fixed typo in metadata console messages.
 -----------------------------------------------------------------------------------------------------------------------------------------------------
-v3.0.0	Aug 9, 2022			-- Added asynchronous downloading of recordings.
+v3.0.0	Aug 9, 2022		-- Added asynchronous downloading of recordings.
 				-- Separated download function into two for easier async implementation.
 				-- Removed "in_progress.txt" functionality to work with async. Be careful with stopping a download as this will corrupt files.
 				-- Modified tests to include async functionality.
 				-- Updated README.
 				-- Added further comments and console messages explaining code functionality.
 				-- Added checking for existence of directory to prevent errors.
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+v3.1.0	Aug XX, 2022	-- Added ability to download full sonographs of audio recordings from the xeno-canto database.
+				-- gen_meta() will now generate metadata for audio and sonographs seperately. It also will now create a 
+				   different json file for each folder path searched. Please consult the implementation for more info.
+				-- Added setUp() to test.py so new testing folder is created to store test files.

@@ -3,12 +3,15 @@ import os
 import shutil
 import unittest
 from urllib import request
-from xenocanto import metadata, download, gen_meta, purge, delete
+from xenocanto import (metadata, download,
+                       gen_meta, purge, delete)
 
 
-# TODO:
-#   [ ] Test resuming a download after interrupt
 class TestCases(unittest.TestCase):
+
+    def setUp(self):
+        os.mkdir('xenocanto_test_dataset/')
+        os.chdir('xenocanto_test_dataset/')
 
     # Check if connection to the API can be established
     def test_conn(self):
@@ -30,6 +33,12 @@ class TestCases(unittest.TestCase):
         self.assertTrue(os.path.exists('dataset/audio/GreatBustard/'
                                        '459281.mp3'))
 
+    def test_download_sono(self):
+        asyncio.run(download(['Cedar Waxwing', 'cnt:Canada'], True))
+        self.assertTrue(os.path.exists('dataset/metadata/'))
+        self.assertTrue(os.path.exists('dataset/sono/CedarWaxwing/'
+                                       '393132.png'))
+
     # Check if purge is deleting folders based on file count
     def test_purge(self):
         asyncio.run(download(['gen:Otis']))
@@ -44,7 +53,7 @@ class TestCases(unittest.TestCase):
         metadata(['gen:Otis'])
         asyncio.run(download(['Bearded Bellbird', 'q:A', 'cnt:Brazil']))
         gen_meta()
-        self.assertTrue(os.path.exists('dataset/metadata/library.json'))
+        self.assertTrue(os.path.exists('dataset/metadata/library_audio.json'))
 
     # Check if deleting files using multiple filters
     def test_delete(self):
@@ -79,11 +88,12 @@ class TestCases(unittest.TestCase):
         asyncio.run(download(['Bearded Bellbird', 'q:A', 'cnt:Brazil']))
         shutil.rmtree(path)
         gen_meta()
-        self.assertTrue(os.path.exists('dataset/metadata/library.json'))
+        self.assertTrue(os.path.exists('dataset/metadata/library_audio.json'))
 
     # Removes files used in testing
     def tearDown(self):
         try:
-            shutil.rmtree('dataset/')
+            os.chdir('../')
+            shutil.rmtree('xenocanto_test_dataset/')
         except OSError:
             pass
