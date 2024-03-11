@@ -119,10 +119,12 @@ def list_urls(path, sono, sono_type='full'):
             name = (data['recordings'][i]['en']).replace(' ', '')
             track_id = data['recordings'][i]['id']
 
-            track_url = data['recordings'][i]['file']
-            track_format = os.path.splitext(data['recordings'][i]['file-name'])[-1]
-            track_info = (name, track_id, track_url, track_format)
-
+            # Determine if the sonogram or audio recording URL is required
+            if sono:
+                dl_url = data['recordings'][i]['sono'][sono_type]
+            else:
+                dl_url = data['recordings'][i]['file']
+            track_info = (name, track_id, dl_url)
             url_list[1].append(track_info)
         page += 1
     return url_list
@@ -145,11 +147,10 @@ def chunked_http_client(num_chunks=4):
             name = str(track_tuple[0])
             track_id = str(track_tuple[1])
             url = track_tuple[2]
-            track_format = track_tuple[3]
 
             # Set up the paths required for saving the audio file
             folder_path = 'dataset/audio/' + name + '/'
-            file_path = folder_path + track_id + track_format
+            file_path = folder_path + track_id + '.mp3'
 
             # Create an audio folder for the species if it does not exist
             if not os.path.exists(folder_path):
@@ -158,7 +159,7 @@ def chunked_http_client(num_chunks=4):
 
             # If the file exists in the directory, we will skip it
             if os.path.exists(file_path):
-                print(track_id + track_format + " is already present. Skipping...")
+                print(track_id + ".mp3 is already present. Skipping...")
                 return
 
             # Use the aiohttp client to retrieve the audio file asynchronously
@@ -168,13 +169,13 @@ def chunked_http_client(num_chunks=4):
                     await f.write(await response.content.read())
                     await f.close()
                 elif response.status == 503:
-                    print("Error 503 occurred when downloading " + track_id
-                          + track_format + ". Please try using a lower value for "
+                    print("Error 503 occurred when downloading " + track_id +
+                          ".mp3. Please try using a lower value for "
                           "num_chunks. Consult the README for more "
                           "information.")
                 else:
                     print("Error " + str(response.status) + " occurred "
-                          "when downloading " + track_id + track_format + ".")
+                          "when downloading " + track_id + ".mp3.")
 
     return http_get
 
