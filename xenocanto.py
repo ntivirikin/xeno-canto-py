@@ -76,7 +76,7 @@ def metadata(filt):
 
 
 # Uses JSON metadata files to generate a list of recording URLs
-def list_urls(path):
+def list_urls(path, sono=False):
     url_list = []
     page = 1
 
@@ -95,7 +95,7 @@ def list_urls(path):
     # Set the first element to the number of recordings
     url_list.append(recordings_num)
 
-    # Second element will be a list of tuples with (name, track_id, file url)
+    # Second element will be a list of tuples with (name, file_id, file_url, file_format)
     url_list.append(list())
 
     # Read each metadata file and extract information into list as a tuple
@@ -111,11 +111,20 @@ def list_urls(path):
         # Parse through the opened data and add it to the URL list
         for i in range(0, rec_length):
             name = (data['recordings'][i]['en']).replace(' ', '')
-            track_id = data['recordings'][i]['id']
-            track_url = data['recordings'][i]['file']
-            track_format = os.path.splitext(data['recordings'][i]['file-name'])[-1]
-            track_info = (name, track_id, track_url, track_format)
-            url_list[1].append(track_info)
+            file_id = data['recordings'][i]['id']
+
+            # Pull URL based on whether downloading track or sonographs
+            file_url = data['recordings'][i]['file']
+            if sono:
+                file_url = 'https:' + data['recordings'][i]['sono']['small']
+
+            if sono:
+                file_format = os.path.splitext(data['recordings'][i]['sono']['small'])[-1]
+            if not sono:
+                file_format = os.path.splitext(data['recordings'][i]['file-name'])[-1]
+
+            file_info = (name, file_id, file_url, file_format)
+            url_list[1].append(file_info)
         page += 1
     return url_list
 
@@ -139,8 +148,13 @@ def chunked_http_client(num_chunks):
             url = track_tuple[2]
             track_format = track_tuple[3]
 
+            if track_format in [".png", ".jpg"]:
+                data_type = "sono/"
+            else: data_type = "audio/"
+
             # Set up the paths required for saving the audio file
             folder_path = 'dataset/audio/' + name + '/'
+            folder_path = 'dataset/' + data_type + name + '/'
             file_path = folder_path + track_id + track_format
 
             # Create an audio folder for the species if it does not exist
@@ -172,11 +186,11 @@ def chunked_http_client(num_chunks):
 
 
 # Retrieves metadata and recordings for a given set of input param
-async def download(filt, num_chunks=4):
+async def download(filt, num_chunks=4, sono=False):
 
     # Retrieve metadata and generate list of track information
     meta_path = metadata(filt)
-    url_list = list_urls(meta_path)
+    url_list = list_urls(meta_path, sono)
 
     # Retrieve the number of recordings to be downloaded
     recordings_num = url_list[0]
@@ -410,6 +424,13 @@ def main():
         dec = input("Proceed with deleting? (Y or N)\n")
         if dec == "Y":
             delete(params)
+
+    # Download sono images of bird species
+    elif act == "-s":
+        start = time.time()
+        asyncio.run(download(params, 4, True))
+        end = time.time()
+        print("Duration: " + str(int(end - start)) + "s")
 
     else:
         print("Command not found, please consult the README.")
