@@ -13,8 +13,8 @@ import aiohttp
 
 
 # TODO:
-#   [X] Log messages to console
-#   [ ] Add sono image download capabilities
+#   [X] Add sono image download capabilities
+#       -> [ ] Update console messages
 #   [ ] Add ability to process multiple species in one command
 #   [ ] Create function to verify all recordings downloaded correctly
 #   [ ] Purge recordings that did not complete download
